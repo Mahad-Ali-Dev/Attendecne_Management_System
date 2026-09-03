@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Evolut Attendance Management System</title>
+<style>
+  :root {
+    --navy: #0B1B2E;
+    --navy2: #13294a;
+    --brand: #2563EB;
+    --brand-light: #eff6ff;
+    --slate: #475569;
+    --slate-light: #94a3b8;
+    --line: #e5e9f0;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: #0b1b2e;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+  .page { padding: 0 4px; }
+  h1, h2, h3 { margin: 0; line-height: 1.25; }
+
+  /* Cover */
+  .cover {
+    background: linear-gradient(135deg, var(--navy) 0%, var(--navy2) 100%);
+    color: #fff;
+    border-radius: 18px;
+    padding: 48px 44px;
+    margin-bottom: 34px;
+    position: relative;
+    overflow: hidden;
+  }
+  .cover::after {
+    content: "";
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(420px circle at 88% 12%, rgba(37,99,235,.45), transparent 45%),
+      radial-gradient(380px circle at 8% 95%, rgba(37,99,235,.30), transparent 42%);
+  }
+  .cover > * { position: relative; z-index: 1; }
+  .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 40px; }
+  .badge-logo {
+    width: 42px; height: 42px; border-radius: 11px;
+    background: var(--brand); color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 22px;
+  }
+  .brand .nm { font-weight: 800; font-size: 15px; letter-spacing: .2px; }
+  .brand .sub { font-size: 10px; letter-spacing: 2.5px; text-transform: uppercase; color: rgba(255,255,255,.55); }
+  .cover h1 { font-size: 34px; font-weight: 800; letter-spacing: -.5px; }
+  .cover .tag { margin-top: 14px; font-size: 14px; color: rgba(255,255,255,.78); max-width: 520px; }
+  .cover .meta { margin-top: 30px; display: flex; gap: 26px; font-size: 11px; color: rgba(255,255,255,.6); }
+  .cover .meta b { display: block; color: #fff; font-size: 13px; margin-top: 2px; font-weight: 600; }
+  .pill { display:inline-block; background: rgba(37,99,235,.25); border:1px solid rgba(255,255,255,.18); color:#fff; font-size:11px; font-weight:600; padding:5px 12px; border-radius:999px; }
+
+  h2.sec {
+    font-size: 17px; font-weight: 800; color: var(--navy);
+    margin: 30px 0 14px; padding-bottom: 8px; border-bottom: 2px solid var(--line);
+    display:flex; align-items:center; gap:9px;
+  }
+  h2.sec .n {
+    width: 22px; height: 22px; border-radius: 6px; background: var(--brand-light);
+    color: var(--brand); font-size: 12px; display:inline-flex; align-items:center; justify-content:center; font-weight:800;
+  }
+  h3.sub3 { font-size: 13px; font-weight: 700; color: var(--navy); margin: 16px 0 7px; }
+  p { margin: 0 0 10px; color: var(--slate); }
+
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .card {
+    border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; background: #fff;
+  }
+  .card h4 { margin: 0 0 4px; font-size: 13px; color: var(--navy); font-weight: 700; }
+  .card p { margin: 0; font-size: 12px; }
+  .card .ico { font-size: 16px; margin-bottom: 6px; display:block; }
+
+  ul.feat { margin: 0; padding: 0; list-style: none; }
+  ul.feat li { padding: 6px 0 6px 24px; position: relative; color: var(--slate); border-bottom: 1px solid #f1f4f9; }
+  ul.feat li:last-child { border-bottom: 0; }
+  ul.feat li::before {
+    content: "✓"; position: absolute; left: 0; top: 6px;
+    color: var(--brand); font-weight: 800;
+  }
+  ul.feat li b { color: var(--navy); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 12px; margin: 4px 0 6px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+  th { background: #f6f8fb; color: var(--slate-light); text-transform: uppercase; font-size: 10px; letter-spacing: .6px; }
+  td code { background: #f1f4f9; padding: 1px 6px; border-radius: 5px; font-size: 11px; color: var(--navy); }
+
+  pre {
+    background: var(--navy); color: #e2e8f0; border-radius: 10px;
+    padding: 14px 16px; font-size: 11.5px; line-height: 1.65; overflow: hidden;
+    font-family: "SF Mono", Consolas, "Courier New", monospace; white-space: pre-wrap; margin: 0 0 12px;
+  }
+  pre .c { color: #7f9cc9; }
+  pre .k { color: #6ee7b7; }
+
+  .steps { counter-reset: step; padding: 0; margin: 0; list-style: none; }
+  .steps > li {
+    position: relative; padding: 0 0 16px 42px; margin: 0;
+  }
+  .steps > li::before {
+    counter-increment: step; content: counter(step);
+    position: absolute; left: 0; top: 0;
+    width: 28px; height: 28px; border-radius: 50%;
+    background: var(--brand); color: #fff; font-weight: 800; font-size: 13px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .steps > li:not(:last-child)::after {
+    content: ""; position: absolute; left: 13.5px; top: 30px; bottom: 2px; width: 2px; background: var(--line);
+  }
+  .steps h3 { font-size: 13.5px; color: var(--navy); margin: 4px 0 5px; font-weight: 700; }
+
+  .note {
+    background: var(--brand-light); border: 1px solid #dbe7ff; border-radius: 10px;
+    padding: 11px 14px; font-size: 12px; color: #1e3a8a; margin: 8px 0 12px;
+  }
+  .note b { color: var(--navy); }
+
+  .footer { margin-top: 26px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 10.5px; color: var(--slate-light); display:flex; justify-content: space-between; }
+
+  .avoid-break { page-break-inside: avoid; }
+  .page-break { page-break-before: always; }
+  @page { size: A4; margin: 14mm 13mm; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- COVER -->
+  <div class="cover avoid-break">
+    <div class="brand">
+      <div class="badge-logo">E</div>
+      <div>
+        <div class="nm">Evolut Ecommerce Solutions</div>
+        <div class="sub">Attendance System</div>
+      </div>
+    </div>
+    <span class="pill">Project Handover &amp; Setup Guide</span>
+    <h1>Attendance Management System</h1>
+    <p class="tag">A clean, production-ready web app for employees to register, mark daily attendance, and for admins to see exactly who&rsquo;s present &mdash; built on Next.js &amp; Supabase.</p>
+    <div class="meta">
+      <div>Prepared for<b>Evolut Ecommerce Solutions</b></div>
+      <div>Stack<b>Next.js 14 · Supabase</b></div>
+      <div>Status<b>Built &amp; build-verified</b></div>
+    </div>
+  </div>
+
+  <!-- WHAT WAS BUILT -->
+  <h2 class="sec"><span class="n">1</span> What was built</h2>
+  <p>A full-stack attendance platform with two role-based experiences &mdash; <b>Employee</b> and <b>Admin</b> &mdash; secured end-to-end by database row-level security. Employees self-register with complete verified details and a photo, then check in / out each day. Admins get live visibility of attendance across the whole team.</p>
+
+  <div class="grid2 avoid-break">
+    <div class="card">
+      <span class="ico">👤</span>
+      <h4>Employee experience</h4>
+      <p>Self-registration with full profile, one-tap check-in / check-out, and personal attendance history.</p>
+    </div>
+    <div class="card">
+      <span class="ico">🛡️</span>
+      <h4>Admin experience</h4>
+      <p>Live &ldquo;who&rsquo;s present today&rdquo; dashboard, team-wide stats, and a searchable employee directory.</p>
+    </div>
+  </div>
+
+  <h3 class="sub3">Key features</h3>
+  <ul class="feat avoid-break">
+    <li><b>Employee self-registration</b> &mdash; full name, work email, password, <b>CNIC</b> (format-validated), <b>phone</b>, <b>address</b>, department, position, and <b>profile photo upload</b>.</li>
+    <li><b>One-tap check-in / check-out</b> with automatic <i>Late</i> detection (after 09:30 PKT).</li>
+    <li><b>Personal dashboard</b> &mdash; today&rsquo;s status, profile card, and a 14-day attendance history.</li>
+    <li><b>Admin overview</b> &mdash; live counts (Present / Late / Not-in) and a real-time table of who is in today.</li>
+    <li><b>Employee directory</b> &mdash; profile cards with full details and per-employee 30-day attendance history.</li>
+    <li><b>Role-based access</b> &mdash; employees see only their own data; admins see everyone (enforced by Postgres Row-Level Security).</li>
+    <li><b>Clean, responsive UI</b> in the Evolut navy brand palette, with the company logo.</li>
+  </ul>
+
+  <!-- TECH STACK -->
+  <h2 class="sec"><span class="n">2</span> Technology stack</h2>
+  <table class="avoid-break">
+    <thead><tr><th>Layer</th><th>Technology</th><th>Why</th></tr></thead>
+    <tbody>
+      <tr><td>Framework</td><td><code>Next.js 14</code> (App Router, TypeScript)</td><td>Fast, SEO-friendly, deploys in one click to Vercel</td></tr>
+      <tr><td>Styling</td><td><code>Tailwind CSS</code></td><td>Clean, consistent, responsive UI</td></tr>
+      <tr><td>Auth</td><td><code>Supabase Auth</code></td><td>Secure email/password sign-in, managed for you</td></tr>
+      <tr><td>Database</td><td><code>Supabase Postgres</code></td><td>Reliable SQL with Row-Level Security</td></tr>
+      <tr><td>File storage</td><td><code>Supabase Storage</code></td><td>Holds employee profile photos</td></tr>
+      <tr><td>Hosting</td><td><code>Vercel</code> (recommended)</td><td>Zero-config Next.js deployment</td></tr>
+    </tbody>
+  </table>
+
+  <div class="page-break"></div>
+
+  <!-- APP STRUCTURE -->
+  <h2 class="sec"><span class="n">3</span> Pages &amp; structure</h2>
+  <table class="avoid-break">
+    <thead><tr><th>Route</th><th>Who</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td><code>/register</code></td><td>Employee</td><td>Full sign-up form incl. CNIC, phone, address, photo</td></tr>
+      <tr><td><code>/login</code></td><td>All</td><td>Sign in</td></tr>
+      <tr><td><code>/dashboard</code></td><td>Employee</td><td>Check-in / out, profile, personal history</td></tr>
+      <tr><td><code>/admin</code></td><td>Admin</td><td>Live overview &mdash; who&rsquo;s present today + stats</td></tr>
+      <tr><td><code>/admin/employees</code></td><td>Admin</td><td>Directory of all employees</td></tr>
+      <tr><td><code>/admin/employees/[id]</code></td><td>Admin</td><td>One employee&rsquo;s full profile &amp; attendance</td></tr>
+    </tbody>
+  </table>
+
+  <pre><span class="c">// project layout</span>
+src/
+  app/
+    (auth)/login, (auth)/register   <span class="c">// branded auth screens</span>
+    dashboard/                      <span class="c">// employee: check-in/out + history</span>
+    admin/                          <span class="c">// admin overview + employee directory</span>
+    api/register/                   <span class="c">// server-side account + photo + profile creation</span>
+  components/                       <span class="c">// Logo, Avatar, header, badges, cards</span>
+  lib/supabase/                     <span class="c">// browser / server / middleware clients</span>
+supabase/schema.sql                 <span class="c">// run once in Supabase</span></pre>
+
+  <!-- SETUP -->
+  <h2 class="sec"><span class="n">4</span> How to set it up</h2>
+  <p>Everything is installed and the production build is verified. The only thing left is connecting your own Supabase project (about 5 minutes).</p>
+
+  <ol class="steps">
+    <li>
+      <h3>Create a Supabase project</h3>
+      <p>Go to <b>supabase.com</b> &rarr; <b>New project</b>. When ready, open <b>Project Settings &rarr; API</b> and copy the <b>Project URL</b>, the <b>anon</b> public key, and the <b>service_role</b> key.</p>
+    </li>
+    <li>
+      <h3>Run the database schema</h3>
+      <p>In Supabase, open <b>SQL Editor &rarr; New query</b>, paste the entire contents of <code>supabase/schema.sql</code>, and click <b>Run</b>. This creates the tables, the photo storage bucket, and all security policies.</p>
+    </li>
+    <li>
+      <h3>Add your environment keys</h3>
+      <p>Copy the example file and fill in the four values:</p>
+      <pre>cp .env.local.example .env.local
+
+NEXT_PUBLIC_SUPABASE_URL=<span class="k">https://YOUR-ref.supabase.co</span>
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<span class="k">...</span>
+SUPABASE_SERVICE_ROLE_KEY=<span class="k">...</span>
+NEXT_PUBLIC_BOOTSTRAP_ADMIN_EMAIL=<span class="k">admin@evolutecomsolutions.com</span></pre>
+    </li>
+    <li>
+      <h3>Run the app</h3>
+      <pre>npm install
+npm run dev</pre>
+      <p>Open <b>http://localhost:3000</b>.</p>
+    </li>
+    <li>
+      <h3>First login</h3>
+      <p>Register first using the email you set in <code>BOOTSTRAP_ADMIN_EMAIL</code> &mdash; that account automatically becomes the <b>Admin</b>. Everyone else who registers is an <b>Employee</b>.</p>
+    </li>
+  </ol>
+
+  <div class="note avoid-break">
+    <b>Make someone an admin later:</b> run this in the Supabase SQL Editor &mdash;<br>
+    <code>update public.profiles set role = 'ADMIN' where email = 'name@evolutecomsolutions.com';</code>
+  </div>
+
+  <!-- DEPLOY -->
+  <h2 class="sec"><span class="n">5</span> Deploying to production</h2>
+  <ol class="steps avoid-break">
+    <li><h3>Push to Git</h3><p>Push this project to a GitHub / GitLab repository.</p></li>
+    <li><h3>Import to Vercel</h3><p>At <b>vercel.com/new</b>, import the repo. No build settings needed &mdash; it&rsquo;s a standard Next.js app.</p></li>
+    <li><h3>Add the same 4 environment variables</h3><p>In <b>Vercel &rarr; Project &rarr; Settings &rarr; Environment Variables</b>, then deploy.</p></li>
+  </ol>
+
+  <!-- NOTES -->
+  <h2 class="sec"><span class="n">6</span> Good to know</h2>
+  <ul class="feat avoid-break">
+    <li>Times use <b>Pakistan Standard Time (UTC+5)</b>; the &ldquo;late&rdquo; cutoff (09:30) is a one-line change in <code>src/app/dashboard/actions.ts</code>.</li>
+    <li>Account creation and photo uploads run <b>server-side</b> with the service-role key &mdash; the secret key is never exposed to the browser.</li>
+    <li>Next.js is pinned to the <b>security-patched 14.2.35</b> release.</li>
+    <li>The one thing that requires your account is creating the Supabase project &mdash; everything else is done and compiling.</li>
+  </ul>
+
+  <div class="footer">
+    <span>Evolut Ecommerce Solutions &mdash; Attendance Management System</span>
+    <span>Ecommerce, engineered for scale.</span>
+  </div>
+
+</div>
+</body>
+</html>
