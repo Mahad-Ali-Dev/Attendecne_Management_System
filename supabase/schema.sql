@@ -17,14 +17,18 @@ create table if not exists public.profiles (
   department   text,
   position     text,
   avatar_url   text,
-  shift_start  time        not null default '09:00',
-  shift_end    time        not null default '17:00',
-  created_at   timestamptz not null default now()
+  shift_start     time        not null default '09:00',
+  shift_end       time        not null default '17:00',
+  device_user_id  text        unique,
+  created_at      timestamptz not null default now()
 );
 
 -- Employees registered before shift scheduling existed still get these columns.
 alter table public.profiles add column if not exists shift_start time not null default '09:00';
 alter table public.profiles add column if not exists shift_end   time not null default '17:00';
+-- Maps a profile to the numeric "user ID" it was assigned during fingerprint
+-- enrollment on the ZKTeco K50 terminal itself. Set by an admin, not at registration.
+alter table public.profiles add column if not exists device_user_id text unique;
 
 -- ---------------------------------------------------------------------------
 -- 2. ATTENDANCE  (one row per employee per day)

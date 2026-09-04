@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Avatar } from "@/components/Avatar";
 import { StatusBadge } from "@/components/StatusBadge";
+import { DeviceMappingForm } from "./DeviceMappingForm";
 import { formatDate, formatTime, formatTimeOfDay, hoursBetween } from "@/lib/format";
 import type { Attendance, Profile } from "@/lib/types";
 import { ArrowLeft, IdCard, Phone, MapPin, Building2, Mail, Briefcase, Clock } from "lucide-react";
@@ -63,7 +64,10 @@ export default async function EmployeeDetail({
             />
             <Row icon={<MapPin className="h-4 w-4" />} label="Address" value={emp.address} />
           </dl>
-          <p className="mt-5 border-t border-slate-50 pt-4 text-xs text-slate-400">
+
+          <DeviceMappingForm employeeId={emp.id} initialValue={emp.device_user_id} />
+
+          <p className="mt-4 border-t border-slate-50 pt-4 text-xs text-slate-400">
             Registered {formatDate(emp.created_at)}
           </p>
         </div>
