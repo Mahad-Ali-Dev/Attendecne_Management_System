@@ -6,13 +6,16 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "sync:zkteco": "node scripts/zkteco-sync.js"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.45.4",
+    "dotenv": "^17.4.2",
     "lucide-react": "^0.441.0",
     "next": "^14.2.35",
+    "node-zklib": "^1.3.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },

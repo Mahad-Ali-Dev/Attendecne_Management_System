@@ -15,6 +15,7 @@ export interface Profile {
   avatar_url: string | null;
   shift_start: string;
   shift_end: string;
+  device_user_id: string | null;
   created_at: string;
 }
 
