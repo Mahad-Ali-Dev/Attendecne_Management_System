@@ -13,6 +13,8 @@ export interface Profile {
   department: string | null;
   position: string | null;
   avatar_url: string | null;
+  shift_start: string;
+  shift_end: string;
   created_at: string;
 }
 

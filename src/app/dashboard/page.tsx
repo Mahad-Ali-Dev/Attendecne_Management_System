@@ -3,7 +3,7 @@ import { getCurrentProfile } from "@/lib/data";
 import { AttendanceWidget } from "./AttendanceWidget";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Avatar } from "@/components/Avatar";
-import { formatDate, formatTime, hoursBetween } from "@/lib/format";
+import { formatDate, formatTime, formatTimeOfDay, hoursBetween } from "@/lib/format";
 import type { Attendance } from "@/lib/types";
 import {
   IdCard,
@@ -11,6 +11,7 @@ import {
   MapPin,
   Building2,
   CalendarDays,
+  Clock,
 } from "lucide-react";
 
 export default async function DashboardPage() {
@@ -60,6 +61,10 @@ export default async function DashboardPage() {
             <Detail icon={<IdCard className="h-4 w-4" />} value={profile.cnic} />
             <Detail icon={<Phone className="h-4 w-4" />} value={profile.phone} />
             <Detail icon={<Building2 className="h-4 w-4" />} value={profile.department} />
+            <Detail
+              icon={<Clock className="h-4 w-4" />}
+              value={`Shift ${formatTimeOfDay(profile.shift_start)} – ${formatTimeOfDay(profile.shift_end)}`}
+            />
             <Detail icon={<MapPin className="h-4 w-4" />} value={profile.address} />
           </dl>
         </div>

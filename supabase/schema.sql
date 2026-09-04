@@ -17,8 +17,14 @@ create table if not exists public.profiles (
   department   text,
   position     text,
   avatar_url   text,
+  shift_start  time        not null default '09:00',
+  shift_end    time        not null default '17:00',
   created_at   timestamptz not null default now()
 );
+
+-- Employees registered before shift scheduling existed still get these columns.
+alter table public.profiles add column if not exists shift_start time not null default '09:00';
+alter table public.profiles add column if not exists shift_end   time not null default '17:00';
 
 -- ---------------------------------------------------------------------------
 -- 2. ATTENDANCE  (one row per employee per day)

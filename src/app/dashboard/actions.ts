@@ -22,9 +22,16 @@ export async function checkIn() {
   } = await supabase.auth.getUser();
   if (!user) return { error: "Not signed in." };
 
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("shift_start")
+    .eq("id", user.id)
+    .single();
+
   const { iso, date, hour, minute } = nowPKT();
-  // Office start 09:30 PKT — anything later counts as LATE.
-  const isLate = hour > 9 || (hour === 9 && minute > 30);
+  // Late if check-in is after the employee's own shift start time.
+  const [shiftHour, shiftMinute] = (profile?.shift_start ?? "09:30").split(":").map(Number);
+  const isLate = hour > shiftHour || (hour === shiftHour && minute > shiftMinute);
 
   const { error } = await supabase.from("attendance").upsert(
     {

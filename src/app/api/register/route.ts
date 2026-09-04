@@ -13,13 +13,19 @@ export async function POST(request: Request) {
     const address = String(form.get("address") || "").trim();
     const department = String(form.get("department") || "").trim() || null;
     const position = String(form.get("position") || "").trim() || null;
+    const shift_start = String(form.get("shift_start") || "").trim();
+    const shift_end = String(form.get("shift_end") || "").trim();
     const photo = form.get("photo") as File | null;
 
-    if (!email || !password || !full_name || !cnic || !phone || !address) {
+    if (!email || !password || !full_name || !cnic || !phone || !address || !shift_start || !shift_end) {
       return NextResponse.json({ error: "Please fill in all required fields." }, { status: 400 });
     }
     if (password.length < 6) {
       return NextResponse.json({ error: "Password must be at least 6 characters." }, { status: 400 });
+    }
+    const TIME_RE = /^([01]\d|2[0-3]):(00|30)$/;
+    if (!TIME_RE.test(shift_start) || !TIME_RE.test(shift_end)) {
+      return NextResponse.json({ error: "Please pick a valid shift start and end time." }, { status: 400 });
     }
 
     const admin = createAdminClient();
@@ -73,15 +79,19 @@ export async function POST(request: Request) {
       department,
       position,
       avatar_url,
+      shift_start,
+      shift_end,
     });
     if (profileErr) {
+      console.error("register: profile insert failed:", profileErr);
       // Roll back the orphaned auth user so the email can be reused.
       await admin.auth.admin.deleteUser(userId);
       return NextResponse.json({ error: "Could not save your profile. Try again." }, { status: 500 });
     }
 
     return NextResponse.json({ ok: true, role });
-  } catch {
+  } catch (err) {
+    console.error("register: unexpected error:", err);
     return NextResponse.json({ error: "Unexpected server error." }, { status: 500 });
   }
 }

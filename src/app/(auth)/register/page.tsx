@@ -4,7 +4,10 @@ import { useState, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { shiftTimeOptions } from "@/lib/format";
 import { Loader2, UserPlus, Upload, Camera } from "lucide-react";
+
+const SHIFT_OPTIONS = shiftTimeOptions();
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -159,6 +162,26 @@ export default function RegisterPage() {
           <div>
             <label className="label">Position</label>
             <input name="position" className="input" placeholder="Account Manager" />
+          </div>
+          <div>
+            <label className="label">Shift start</label>
+            <select name="shift_start" required defaultValue="09:00" className="input">
+              {SHIFT_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="label">Shift end</label>
+            <select name="shift_end" required defaultValue="17:00" className="input">
+              {SHIFT_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
           </div>
           <div className="sm:col-span-2">
             <label className="label">Address</label>

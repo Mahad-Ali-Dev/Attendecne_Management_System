@@ -3,9 +3,9 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Avatar } from "@/components/Avatar";
 import { StatusBadge } from "@/components/StatusBadge";
-import { formatDate, formatTime, hoursBetween } from "@/lib/format";
+import { formatDate, formatTime, formatTimeOfDay, hoursBetween } from "@/lib/format";
 import type { Attendance, Profile } from "@/lib/types";
-import { ArrowLeft, IdCard, Phone, MapPin, Building2, Mail, Briefcase } from "lucide-react";
+import { ArrowLeft, IdCard, Phone, MapPin, Building2, Mail, Briefcase, Clock } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -56,6 +56,11 @@ export default async function EmployeeDetail({
             <Row icon={<Phone className="h-4 w-4" />} label="Phone" value={emp.phone} />
             <Row icon={<Building2 className="h-4 w-4" />} label="Department" value={emp.department} />
             <Row icon={<Briefcase className="h-4 w-4" />} label="Position" value={emp.position} />
+            <Row
+              icon={<Clock className="h-4 w-4" />}
+              label="Shift"
+              value={`${formatTimeOfDay(emp.shift_start)} – ${formatTimeOfDay(emp.shift_end)}`}
+            />
             <Row icon={<MapPin className="h-4 w-4" />} label="Address" value={emp.address} />
           </dl>
           <p className="mt-5 border-t border-slate-50 pt-4 text-xs text-slate-400">
