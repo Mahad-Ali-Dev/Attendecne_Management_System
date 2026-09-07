@@ -6,7 +6,7 @@ Built with **Next.js 14 (App Router) + TypeScript + Tailwind CSS + Supabase** (A
 ## Features
 
 - **Employee self-registration** — full name, work email, password, **CNIC**, **phone**, **address**, department, position, **shift start/end time**, and **profile photo**.
-- **One-tap check-in / check-out** with automatic *Late* detection (checking in after your own shift start).
+- **One-tap check-in / check-out** with automatic *Late* detection (checking in more than 30 minutes after your own shift start).
 - **Personal dashboard** — today's status, profile card, and 14-day attendance history.
 - **Monthly hours tab** — each employee sees a chart of hours worked per day this month against their shift target, plus working days/expected/completed/completion-% stats and a full daily breakdown table.
 - **Admin overview** — live counts (present / late / not-in) and a real-time table of who's in today.

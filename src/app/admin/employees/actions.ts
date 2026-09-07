@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireAdmin } from "@/lib/data";
+import { isLateCheckIn } from "@/lib/format";
 
 /**
  * Links an employee to the numeric user ID their fingerprint was enrolled
@@ -72,11 +73,7 @@ export async function upsertAttendance(
 
   const check_in = checkInTime ? pktToISOString(workDate, checkInTime) : null;
   const check_out = checkOutTime ? pktToISOString(workDate, checkOutTime) : null;
-  const status = !checkInTime
-    ? "ABSENT"
-    : timeToMinutes(checkInTime) > timeToMinutes(profile.shift_start)
-      ? "LATE"
-      : "PRESENT";
+  const status = !checkInTime ? "ABSENT" : isLateCheckIn(checkInTime, profile.shift_start) ? "LATE" : "PRESENT";
 
   const { error } = await supabase
     .from("attendance")

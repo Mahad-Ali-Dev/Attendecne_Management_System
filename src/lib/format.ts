@@ -75,6 +75,16 @@ export function shiftLengthHours(shiftStart: string, shiftEnd: string): number {
   return minutes / 60;
 }
 
+/** Minutes of grace after shift start before a check-in counts as Late. */
+export const LATE_GRACE_MINUTES = 30;
+
+/** Whether a "HH:MM" check-in time is Late relative to a "HH:MM" shift start. */
+export function isLateCheckIn(checkInTime: string, shiftStart: string): boolean {
+  const [ch, cm] = checkInTime.split(":").map(Number);
+  const [sh, sm] = shiftStart.split(":").map(Number);
+  return ch * 60 + cm > sh * 60 + sm + LATE_GRACE_MINUTES;
+}
+
 /** Extracts an ISO timestamp's PKT wall-clock time as "HH:MM", for time inputs. */
 export function isoToPktTimeInput(value: string | null): string {
   if (!value) return "";
