@@ -15,6 +15,7 @@ function navItems(isAdmin: boolean) {
     return [
       { href: "/admin", label: "Admin", icon: ShieldCheck },
       { href: "/admin/employees", label: "Employees", icon: Users },
+      { href: "/admin/salary", label: "Salary", icon: Wallet },
     ];
   }
   return [
