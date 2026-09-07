@@ -3,91 +3,68 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { upsertAttendance } from "../actions";
+import { Modal } from "@/components/Modal";
 import { StatusBadge } from "@/components/StatusBadge";
 import { formatDate, formatTime, hoursBetween, isoToPktTimeInput, todayISO } from "@/lib/format";
 import type { Attendance } from "@/lib/types";
-import { Loader2, Pencil } from "lucide-react";
+import { Loader2, Pencil, Plus } from "lucide-react";
+
+interface EditState {
+  date: string;
+  checkIn: string;
+  checkOut: string;
+}
 
 export function AttendanceEditor({ employeeId, history }: { employeeId: string; history: Attendance[] }) {
   const router = useRouter();
-  const [editDate, setEditDate] = useState("");
-  const [checkIn, setCheckIn] = useState("");
-  const [checkOut, setCheckOut] = useState("");
+  const [modal, setModal] = useState<EditState | null>(null);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
 
-  function edit(r: Attendance) {
-    setEditDate(r.work_date);
-    setCheckIn(isoToPktTimeInput(r.check_in));
-    setCheckOut(isoToPktTimeInput(r.check_out));
+  function openAdd() {
+    setModal({ date: "", checkIn: "", checkOut: "" });
     setError(null);
-    setSaved(false);
+  }
+
+  function openEdit(r: Attendance) {
+    setModal({ date: r.work_date, checkIn: isoToPktTimeInput(r.check_in), checkOut: isoToPktTimeInput(r.check_out) });
+    setError(null);
+  }
+
+  function closeModal() {
+    setModal(null);
+    setError(null);
   }
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!modal) return;
     setError(null);
-    setSaved(false);
     startTransition(async () => {
-      const res = await upsertAttendance(employeeId, editDate, checkIn, checkOut);
+      const res = await upsertAttendance(employeeId, modal.date, modal.checkIn, modal.checkOut);
       if (res?.error) {
         setError(res.error);
       } else {
-        setSaved(true);
         router.refresh();
+        closeModal();
       }
     });
   }
 
   return (
     <div className="card overflow-hidden lg:col-span-2">
-      <div className="border-b border-slate-100 px-6 py-4">
-        <h2 className="font-semibold text-navy">Attendance history</h2>
-        <p className="text-xs text-slate-400">Last 30 records</p>
-      </div>
-
-      <form onSubmit={onSubmit} className="border-b border-slate-100 bg-slate-50 px-6 py-4">
-        <p className="mb-2.5 text-xs font-medium uppercase tracking-wide text-slate-400">
-          Add or correct a record
-        </p>
-        <div className="flex flex-wrap items-end gap-3">
-          <div>
-            <label className="label">Date</label>
-            <input
-              type="date"
-              required
-              max={todayISO()}
-              value={editDate}
-              onChange={(e) => setEditDate(e.target.value)}
-              className="input"
-            />
-          </div>
-          <div>
-            <label className="label">Check-in</label>
-            <input
-              type="time"
-              value={checkIn}
-              onChange={(e) => setCheckIn(e.target.value)}
-              className="input"
-            />
-          </div>
-          <div>
-            <label className="label">Check-out</label>
-            <input
-              type="time"
-              value={checkOut}
-              onChange={(e) => setCheckOut(e.target.value)}
-              className="input"
-            />
-          </div>
-          <button type="submit" disabled={pending} className="btn-primary">
-            {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
-          </button>
+      <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+        <div>
+          <h2 className="font-semibold text-navy">Attendance history</h2>
+          <p className="text-xs text-slate-400">Last 30 records</p>
         </div>
-        {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
-        {saved && !error && <p className="mt-2 text-xs text-emerald-600">Saved.</p>}
-      </form>
+        <button
+          onClick={openAdd}
+          className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-brand-600 transition hover:bg-brand-50"
+        >
+          <Plus className="h-3.5 w-3.5" /> Add record
+        </button>
+      </div>
 
       {history.length === 0 ? (
         <p className="px-6 py-10 text-center text-sm text-slate-400">No attendance recorded yet.</p>
@@ -115,7 +92,7 @@ export function AttendanceEditor({ employeeId, history }: { employeeId: string; 
                 </td>
                 <td className="px-6 py-3 text-right">
                   <button
-                    onClick={() => edit(r)}
+                    onClick={() => openEdit(r)}
                     aria-label={`Edit ${r.work_date}`}
                     className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-navy"
                   >
@@ -126,6 +103,53 @@ export function AttendanceEditor({ employeeId, history }: { employeeId: string; 
             ))}
           </tbody>
         </table>
+      )}
+
+      {modal && (
+        <Modal title={modal.date ? "Edit attendance" : "Add attendance record"} onClose={closeModal}>
+          <form onSubmit={onSubmit} className="space-y-4">
+            <div>
+              <label className="label">Date</label>
+              <input
+                type="date"
+                required
+                max={todayISO()}
+                value={modal.date}
+                onChange={(e) => setModal({ ...modal, date: e.target.value })}
+                className="input"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="label">Check-in</label>
+                <input
+                  type="time"
+                  value={modal.checkIn}
+                  onChange={(e) => setModal({ ...modal, checkIn: e.target.value })}
+                  className="input"
+                />
+              </div>
+              <div>
+                <label className="label">Check-out</label>
+                <input
+                  type="time"
+                  value={modal.checkOut}
+                  onChange={(e) => setModal({ ...modal, checkOut: e.target.value })}
+                  className="input"
+                />
+              </div>
+            </div>
+            {error && <p className="text-xs text-red-600">{error}</p>}
+            <div className="flex justify-end gap-2 pt-2">
+              <button type="button" onClick={closeModal} className="btn-ghost">
+                Cancel
+              </button>
+              <button type="submit" disabled={pending} className="btn-primary">
+                {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
+              </button>
+            </div>
+          </form>
+        </Modal>
       )}
     </div>
   );
