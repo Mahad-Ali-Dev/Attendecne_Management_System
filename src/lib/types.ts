@@ -29,3 +29,14 @@ export interface Attendance {
   note: string | null;
   created_at: string;
 }
+
+export interface SalarySlip {
+  id: string;
+  user_id: string;
+  month: string;
+  basic_salary: number;
+  allowances: number;
+  deductions: number;
+  note: string | null;
+  created_at: string;
+}

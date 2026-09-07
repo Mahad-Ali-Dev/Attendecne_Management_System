@@ -49,6 +49,23 @@ create index if not exists attendance_date_idx on public.attendance (work_date);
 create index if not exists attendance_user_idx on public.attendance (user_id);
 
 -- ---------------------------------------------------------------------------
+-- 2b. SALARY SLIPS  (one row per employee per month, set by an admin)
+-- ---------------------------------------------------------------------------
+create table if not exists public.salary_slips (
+  id            uuid primary key default gen_random_uuid(),
+  user_id       uuid not null references public.profiles (id) on delete cascade,
+  month         date not null,  -- always the 1st of the month, e.g. 2026-09-01
+  basic_salary  numeric(12,2) not null default 0,
+  allowances    numeric(12,2) not null default 0,
+  deductions    numeric(12,2) not null default 0,
+  note          text,
+  created_at    timestamptz not null default now(),
+  unique (user_id, month)
+);
+
+create index if not exists salary_slips_user_idx on public.salary_slips (user_id);
+
+-- ---------------------------------------------------------------------------
 -- 3. is_admin()  — SECURITY DEFINER avoids RLS recursion on profiles
 -- ---------------------------------------------------------------------------
 create or replace function public.is_admin()
@@ -66,8 +83,9 @@ $$;
 -- ---------------------------------------------------------------------------
 -- 4. ROW LEVEL SECURITY
 -- ---------------------------------------------------------------------------
-alter table public.profiles   enable row level security;
-alter table public.attendance enable row level security;
+alter table public.profiles     enable row level security;
+alter table public.attendance   enable row level security;
+alter table public.salary_slips enable row level security;
 
 -- profiles -------------------------------------------------------------------
 drop policy if exists "read own or admin reads all" on public.profiles;
@@ -95,6 +113,28 @@ create policy "insert own attendance" on public.attendance
 drop policy if exists "update own attendance" on public.attendance;
 create policy "update own attendance" on public.attendance
   for update using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+drop policy if exists "admin inserts any attendance" on public.attendance;
+create policy "admin inserts any attendance" on public.attendance
+  for insert with check (public.is_admin());
+
+drop policy if exists "admin updates any attendance" on public.attendance;
+create policy "admin updates any attendance" on public.attendance
+  for update using (public.is_admin()) with check (public.is_admin());
+
+-- salary slips -----------------------------------------------------------------
+-- Employees can only ever read their own; only an admin creates or edits one.
+drop policy if exists "read own salary or admin reads all" on public.salary_slips;
+create policy "read own salary or admin reads all" on public.salary_slips
+  for select using (user_id = auth.uid() or public.is_admin());
+
+drop policy if exists "admin inserts any salary slip" on public.salary_slips;
+create policy "admin inserts any salary slip" on public.salary_slips
+  for insert with check (public.is_admin());
+
+drop policy if exists "admin updates any salary slip" on public.salary_slips;
+create policy "admin updates any salary slip" on public.salary_slips
+  for update using (public.is_admin()) with check (public.is_admin());
 
 -- ---------------------------------------------------------------------------
 -- 5. STORAGE bucket for profile photos (public read)

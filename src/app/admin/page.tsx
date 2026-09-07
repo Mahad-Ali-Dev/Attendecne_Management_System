@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { requireAdmin } from "@/lib/data";
 import { Avatar } from "@/components/Avatar";
 import { StatCard } from "@/components/StatCard";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -10,6 +11,7 @@ import { Users, UserCheck, Clock3, UserX } from "lucide-react";
 export const dynamic = "force-dynamic";
 
 export default async function AdminDashboard() {
+  const admin = await requireAdmin();
   const supabase = createClient();
   const today = new Date(Date.now() + 5 * 3600 * 1000).toISOString().slice(0, 10);
 
@@ -33,7 +35,7 @@ export default async function AdminDashboard() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-bold text-navy">Admin overview</h1>
+        <h1 className="text-2xl font-bold text-navy">Hi, {admin.full_name.split(" ")[0]} 👋</h1>
         <p className="mt-1 text-sm text-slate-500">{formatDate(today)}</p>
       </div>
 

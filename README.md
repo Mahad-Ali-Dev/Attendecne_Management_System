@@ -8,8 +8,10 @@ Built with **Next.js 14 (App Router) + TypeScript + Tailwind CSS + Supabase** (A
 - **Employee self-registration** — full name, work email, password, **CNIC**, **phone**, **address**, department, position, **shift start/end time**, and **profile photo**.
 - **One-tap check-in / check-out** with automatic *Late* detection (checking in after your own shift start).
 - **Personal dashboard** — today's status, profile card, and 14-day attendance history.
+- **Monthly hours tab** — each employee sees a chart of hours worked per day this month against their shift target, plus working days/expected/completed/completion-% stats and a full daily breakdown table.
 - **Admin overview** — live counts (present / late / not-in) and a real-time table of who's in today.
-- **Employee directory** — searchable cards with full profiles and per-employee 30-day attendance history.
+- **Employee directory** — searchable cards with full profiles and per-employee 30-day attendance history, with admin-editable check-in/check-out times for correcting or backfilling any day.
+- **Salary slips** — admin sets basic salary/allowances/deductions per employee per month; each employee gets a "Salary Slip" tab to view or download a PDF payslip (with an attendance summary for that month baked in).
 - **Role-based access** — employees see only their own data; admins see everyone (enforced by Postgres Row-Level Security).
 - **ZKTeco K50 fingerprint sync (optional)** — a bridge script pulls punches from a physical K50 terminal and turns them into check-in/check-out records automatically.
 - Clean, responsive UI in the Evolut navy brand palette.

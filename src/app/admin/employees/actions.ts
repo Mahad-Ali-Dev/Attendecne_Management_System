@@ -30,3 +30,100 @@ export async function setDeviceUserId(employeeId: string, deviceUserId: string) 
   revalidatePath(`/admin/employees/${employeeId}`);
   return { ok: true };
 }
+
+function timeToMinutes(time: string): number {
+  const [h, m] = time.split(":").map(Number);
+  return h * 60 + m;
+}
+
+/** Builds a UTC ISO timestamp from a PKT (UTC+5) work date + wall-clock time. */
+function pktToISOString(workDate: string, time: string): string {
+  return new Date(`${workDate}T${time}:00+05:00`).toISOString();
+}
+
+/**
+ * Admin correction for an employee's check-in/check-out on a given day.
+ * Upserts the attendance row (creates it if the employee never punched at
+ * all that day) and recomputes LATE/PRESENT/ABSENT from the new check-in
+ * time, the same way the check-in button and the device sync do.
+ * Pass an empty string for either time to leave/clear it.
+ */
+export async function upsertAttendance(
+  employeeId: string,
+  workDate: string,
+  checkInTime: string,
+  checkOutTime: string
+) {
+  await requireAdmin();
+  const supabase = createClient();
+
+  if (!workDate) return { error: "Pick a date." };
+  if (checkOutTime && !checkInTime) return { error: "Set a check-in time first." };
+  if (checkInTime && checkOutTime && timeToMinutes(checkOutTime) <= timeToMinutes(checkInTime)) {
+    return { error: "Check-out must be after check-in." };
+  }
+
+  const { data: profile, error: profileErr } = await supabase
+    .from("profiles")
+    .select("shift_start")
+    .eq("id", employeeId)
+    .single();
+  if (profileErr || !profile) return { error: "Employee not found." };
+
+  const check_in = checkInTime ? pktToISOString(workDate, checkInTime) : null;
+  const check_out = checkOutTime ? pktToISOString(workDate, checkOutTime) : null;
+  const status = !checkInTime
+    ? "ABSENT"
+    : timeToMinutes(checkInTime) > timeToMinutes(profile.shift_start)
+      ? "LATE"
+      : "PRESENT";
+
+  const { error } = await supabase
+    .from("attendance")
+    .upsert(
+      { user_id: employeeId, work_date: workDate, check_in, check_out, status },
+      { onConflict: "user_id,work_date" }
+    );
+
+  if (error) return { error: error.message };
+  revalidatePath(`/admin/employees/${employeeId}`);
+  return { ok: true };
+}
+
+/**
+ * Admin creates or edits an employee's salary slip for a given month
+ * ("YYYY-MM"). Upserts on (user_id, month) so re-saving the same month
+ * corrects it rather than creating a duplicate.
+ */
+export async function upsertSalarySlip(
+  employeeId: string,
+  month: string,
+  basicSalary: number,
+  allowances: number,
+  deductions: number,
+  note: string
+) {
+  await requireAdmin();
+  const supabase = createClient();
+
+  if (!/^\d{4}-\d{2}$/.test(month)) return { error: "Pick a month." };
+  if ([basicSalary, allowances, deductions].some((n) => !Number.isFinite(n) || n < 0)) {
+    return { error: "Amounts must be zero or greater." };
+  }
+
+  const { error } = await supabase.from("salary_slips").upsert(
+    {
+      user_id: employeeId,
+      month: `${month}-01`,
+      basic_salary: basicSalary,
+      allowances,
+      deductions,
+      note: note.trim() || null,
+    },
+    { onConflict: "user_id,month" }
+  );
+
+  if (error) return { error: error.message };
+  revalidatePath(`/admin/employees/${employeeId}`);
+  return { ok: true };
+}
