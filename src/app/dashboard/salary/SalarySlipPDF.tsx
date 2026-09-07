@@ -9,6 +9,7 @@ export interface AttendanceSummary {
   present: number;
   late: number;
   absent: number;
+  onLeave: number;
 }
 
 const styles = StyleSheet.create({
@@ -104,6 +105,7 @@ export function SalarySlipDocument({
           <Line label="Working days" value={attendanceSummary.workingDays} />
           <Line label="Present" value={attendanceSummary.present} />
           <Line label="Late" value={attendanceSummary.late} />
+          <Line label="On leave" value={attendanceSummary.onLeave} />
           <Line label="Absent" value={attendanceSummary.absent} />
         </View>
 

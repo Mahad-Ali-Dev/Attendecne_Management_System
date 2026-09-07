@@ -5,8 +5,9 @@ import { Avatar } from "@/components/Avatar";
 import { DeviceMappingForm } from "./DeviceMappingForm";
 import { AttendanceEditor } from "./AttendanceEditor";
 import { SalarySlipEditor } from "./SalarySlipEditor";
+import { EmployeeLeaveHistory } from "./EmployeeLeaveHistory";
 import { formatDate, formatTimeOfDay } from "@/lib/format";
-import type { Attendance, Profile, SalarySlip } from "@/lib/types";
+import type { Attendance, LeaveRequest, Profile, SalarySlip } from "@/lib/types";
 import { ArrowLeft, IdCard, Phone, MapPin, Building2, Mail, Briefcase, Clock } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -20,7 +21,7 @@ export default async function EmployeeDetail({
 
   const salaryLookback = new Date(Date.now() - 400 * 86_400_000).toISOString().slice(0, 10);
 
-  const [{ data: profileData }, { data: attData }, { data: slipData }, { data: salaryAttData }] =
+  const [{ data: profileData }, { data: attData }, { data: slipData }, { data: salaryAttData }, { data: leaveData }] =
     await Promise.all([
       supabase.from("profiles").select("*").eq("id", params.id).single(),
       supabase
@@ -41,6 +42,11 @@ export default async function EmployeeDetail({
         .select("*")
         .eq("user_id", params.id)
         .gte("work_date", salaryLookback),
+      supabase
+        .from("leave_requests")
+        .select("*")
+        .eq("user_id", params.id)
+        .order("start_date", { ascending: false }),
     ]);
 
   if (!profileData) notFound();
@@ -48,6 +54,7 @@ export default async function EmployeeDetail({
   const history = (attData ?? []) as Attendance[];
   const slips = (slipData ?? []) as SalarySlip[];
   const attendanceForSalary = (salaryAttData ?? []) as Attendance[];
+  const leaveRequests = (leaveData ?? []) as LeaveRequest[];
 
   return (
     <div className="space-y-6">
@@ -95,9 +102,11 @@ export default async function EmployeeDetail({
           employeeId={emp.id}
           slips={slips}
           attendance={attendanceForSalary}
+          leaveRequests={leaveRequests}
           shiftStart={emp.shift_start}
           shiftEnd={emp.shift_end}
         />
+        <EmployeeLeaveHistory requests={leaveRequests} />
       </div>
     </div>
   );

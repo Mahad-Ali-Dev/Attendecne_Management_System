@@ -66,6 +66,26 @@ create table if not exists public.salary_slips (
 create index if not exists salary_slips_user_idx on public.salary_slips (user_id);
 
 -- ---------------------------------------------------------------------------
+-- 2c. LEAVE REQUESTS  (employee-submitted, admin-reviewed)
+-- ---------------------------------------------------------------------------
+create table if not exists public.leave_requests (
+  id           uuid primary key default gen_random_uuid(),
+  user_id      uuid not null references public.profiles (id) on delete cascade,
+  start_date   date not null,
+  end_date     date not null,
+  leave_type   text not null default 'CASUAL' check (leave_type in ('SICK', 'CASUAL', 'ANNUAL', 'OTHER')),
+  reason       text,
+  status       text not null default 'PENDING' check (status in ('PENDING', 'APPROVED', 'REJECTED')),
+  reviewed_by  uuid references public.profiles (id),
+  reviewed_at  timestamptz,
+  created_at   timestamptz not null default now(),
+  check (end_date >= start_date)
+);
+
+create index if not exists leave_requests_user_idx on public.leave_requests (user_id);
+create index if not exists leave_requests_status_idx on public.leave_requests (status);
+
+-- ---------------------------------------------------------------------------
 -- 3. is_admin()  — SECURITY DEFINER avoids RLS recursion on profiles
 -- ---------------------------------------------------------------------------
 create or replace function public.is_admin()
@@ -83,9 +103,10 @@ $$;
 -- ---------------------------------------------------------------------------
 -- 4. ROW LEVEL SECURITY
 -- ---------------------------------------------------------------------------
-alter table public.profiles     enable row level security;
-alter table public.attendance   enable row level security;
-alter table public.salary_slips enable row level security;
+alter table public.profiles      enable row level security;
+alter table public.attendance    enable row level security;
+alter table public.salary_slips  enable row level security;
+alter table public.leave_requests enable row level security;
 
 -- profiles -------------------------------------------------------------------
 drop policy if exists "read own or admin reads all" on public.profiles;
@@ -134,6 +155,24 @@ create policy "admin inserts any salary slip" on public.salary_slips
 
 drop policy if exists "admin updates any salary slip" on public.salary_slips;
 create policy "admin updates any salary slip" on public.salary_slips
+  for update using (public.is_admin()) with check (public.is_admin());
+
+-- leave requests ---------------------------------------------------------------
+drop policy if exists "read own leave or admin reads all" on public.leave_requests;
+create policy "read own leave or admin reads all" on public.leave_requests
+  for select using (user_id = auth.uid() or public.is_admin());
+
+drop policy if exists "insert own leave request" on public.leave_requests;
+create policy "insert own leave request" on public.leave_requests
+  for insert with check (user_id = auth.uid());
+
+-- Withdraw a request you haven't heard back on yet — once reviewed, it stands.
+drop policy if exists "cancel own pending leave request" on public.leave_requests;
+create policy "cancel own pending leave request" on public.leave_requests
+  for delete using (user_id = auth.uid() and status = 'PENDING');
+
+drop policy if exists "admin reviews any leave request" on public.leave_requests;
+create policy "admin reviews any leave request" on public.leave_requests
   for update using (public.is_admin()) with check (public.is_admin());
 
 -- ---------------------------------------------------------------------------

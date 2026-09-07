@@ -4,9 +4,9 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { upsertSalarySlip } from "./actions";
 import { formatCurrency, formatHours, pktNow } from "@/lib/format";
-import { summarizeMonth, autoDeduction } from "@/lib/payroll";
-import type { Attendance, SalarySlip } from "@/lib/types";
-import { Loader2, Clock, Target, TrendingDown, CalendarCheck, RefreshCw } from "lucide-react";
+import { summarizeMonth, autoDeduction, leaveDatesSet } from "@/lib/payroll";
+import type { Attendance, LeaveRequest, SalarySlip } from "@/lib/types";
+import { Loader2, Clock, Target, TrendingDown, CalendarCheck, CalendarOff, RefreshCw } from "lucide-react";
 
 /**
  * The actual salary editing UI: attendance-vs-target breakdown, an
@@ -20,6 +20,7 @@ export function SalaryForm({
   shiftStart,
   shiftEnd,
   attendance,
+  leaveRequests = [],
   existingSlip,
   previousSlip,
   onSaved,
@@ -29,6 +30,7 @@ export function SalaryForm({
   shiftStart: string;
   shiftEnd: string;
   attendance: Attendance[];
+  leaveRequests?: LeaveRequest[];
   existingSlip?: SalarySlip;
   previousSlip?: SalarySlip;
   onSaved?: () => void;
@@ -46,9 +48,10 @@ export function SalaryForm({
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
+  const leaveDates = useMemo(() => leaveDatesSet(leaveRequests), [leaveRequests]);
   const summary = useMemo(
-    () => summarizeMonth(attendance, month, shiftStart, shiftEnd, todayKey),
-    [attendance, month, shiftStart, shiftEnd, todayKey]
+    () => summarizeMonth(attendance, month, shiftStart, shiftEnd, todayKey, leaveDates),
+    [attendance, month, shiftStart, shiftEnd, todayKey, leaveDates]
   );
 
   const basicSalaryNum = Number(basicSalary) || 0;
@@ -85,8 +88,14 @@ export function SalaryForm({
     <form onSubmit={onSubmit}>
       <div className="rounded-xl border border-slate-200 bg-white p-4">
         <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Attendance this month</p>
-        <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-5">
           <MiniStat icon={<CalendarCheck className="h-4 w-4" />} label="Working days" value={summary.workingDays} />
+          <MiniStat
+            icon={<CalendarOff className="h-4 w-4" />}
+            label="On leave"
+            value={summary.leaveDays}
+            accent={summary.leaveDays > 0 ? "text-brand-600" : "text-navy"}
+          />
           <MiniStat icon={<Clock className="h-4 w-4" />} label="Hours worked" value={formatHours(summary.actualHours)} />
           <MiniStat icon={<Target className="h-4 w-4" />} label="Expected" value={formatHours(summary.expectedHours)} />
           <MiniStat
@@ -102,6 +111,18 @@ export function SalaryForm({
             style={{ width: `${workedRatio}%` }}
           />
         </div>
+
+        {summary.leaveDays > 0 && (
+          <div className="mt-3 flex items-center gap-2 rounded-lg bg-brand-50 px-3 py-2.5 text-xs text-brand-700">
+            <CalendarOff className="h-3.5 w-3.5 shrink-0" />
+            <span>
+              <span className="font-semibold">
+                {summary.leaveDays} approved leave {summary.leaveDays === 1 ? "day" : "days"}
+              </span>{" "}
+              excluded from expected hours this month — not counted toward the deduction below.
+            </span>
+          </div>
+        )}
 
         {summary.hoursShort > 0 && basicSalaryNum > 0 && (
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg bg-amber-50 px-3 py-2.5 text-xs text-amber-800">

@@ -3,7 +3,8 @@ import { getCurrentProfile } from "@/lib/data";
 import { createClient } from "@/lib/supabase/server";
 import { SalarySlipView } from "./SalarySlipView";
 import { formatMonthLabel, isWorkingDay, monthKeyOf, pktNow, shiftMonthKey } from "@/lib/format";
-import type { Attendance, SalarySlip } from "@/lib/types";
+import { leaveDatesSet } from "@/lib/payroll";
+import type { Attendance, LeaveRequest, SalarySlip } from "@/lib/types";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -27,7 +28,7 @@ export default async function SalarySlipPage({
   const monthStart = `${monthKey}-01`;
   const monthEnd = `${monthKey}-${String(daysInMonth).padStart(2, "0")}`;
 
-  const [{ data: slipData }, { data: attData }] = await Promise.all([
+  const [{ data: slipData }, { data: attData }, { data: leaveData }] = await Promise.all([
     supabase
       .from("salary_slips")
       .select("*")
@@ -40,21 +41,28 @@ export default async function SalarySlipPage({
       .eq("user_id", profile.id)
       .gte("work_date", monthStart)
       .lte("work_date", monthEnd),
+    supabase.from("leave_requests").select("*").eq("user_id", profile.id).eq("status", "APPROVED"),
   ]);
 
   const slip = (slipData as SalarySlip | null) ?? null;
   const byDate = new Map(((attData ?? []) as Attendance[]).map((a) => [a.work_date, a]));
+  const leaveDates = leaveDatesSet((leaveData ?? []) as LeaveRequest[]);
 
   let workingDays = 0;
   let present = 0;
   let late = 0;
   let absent = 0;
+  let onLeave = 0;
   for (let d = 1; d <= daysInMonth; d++) {
     const dateObj = new Date(Date.UTC(year, month - 1, d));
     if (!isWorkingDay(dateObj)) continue;
     const dateStr = `${monthKey}-${String(d).padStart(2, "0")}`;
     if (dateStr > todayKey) continue; // don't count days that haven't happened yet
     workingDays++;
+    if (leaveDates.has(dateStr)) {
+      onLeave++;
+      continue;
+    }
     const rec = byDate.get(dateStr);
     if (!rec?.check_in) absent++;
     else if (rec.status === "LATE") late++;
@@ -101,7 +109,7 @@ export default async function SalarySlipPage({
         slip={slip}
         monthLabel={monthLabel}
         monthKey={monthKey}
-        attendanceSummary={{ workingDays, present, late, absent }}
+        attendanceSummary={{ workingDays, present, late, absent, onLeave }}
       />
     </div>
   );

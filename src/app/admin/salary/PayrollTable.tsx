@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Avatar } from "@/components/Avatar";
 import { SalaryForm } from "../SalaryForm";
 import { formatCurrency } from "@/lib/format";
-import type { Attendance, Profile, SalarySlip } from "@/lib/types";
+import type { Attendance, LeaveRequest, Profile, SalarySlip } from "@/lib/types";
 import { ChevronDown, ChevronUp } from "lucide-react";
 
 function netPay(s: { basic_salary: number; allowances: number; deductions: number }) {
@@ -17,11 +17,13 @@ export function PayrollTable({
   month,
   slips,
   attendance,
+  leaveRequests,
 }: {
   employees: Profile[];
   month: string;
   slips: SalarySlip[];
   attendance: Attendance[];
+  leaveRequests: LeaveRequest[];
 }) {
   const [expanded, setExpanded] = useState<string | null>(null);
 
@@ -52,6 +54,15 @@ export function PayrollTable({
     }
     return map;
   }, [attendance]);
+
+  const leaveByUser = useMemo(() => {
+    const map = new Map<string, LeaveRequest[]>();
+    for (const lr of leaveRequests) {
+      if (!map.has(lr.user_id)) map.set(lr.user_id, []);
+      map.get(lr.user_id)!.push(lr);
+    }
+    return map;
+  }, [leaveRequests]);
 
   if (employees.length === 0) {
     return (
@@ -123,6 +134,7 @@ export function PayrollTable({
                         shiftStart={emp.shift_start}
                         shiftEnd={emp.shift_end}
                         attendance={attendanceByUser.get(emp.id) ?? []}
+                        leaveRequests={leaveByUser.get(emp.id) ?? []}
                         existingSlip={slip}
                         previousSlip={previousSlipByUser.get(emp.id)}
                         onSaved={() => setExpanded(null)}

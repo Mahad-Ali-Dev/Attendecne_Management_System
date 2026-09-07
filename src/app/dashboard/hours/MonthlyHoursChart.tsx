@@ -14,7 +14,7 @@ import {
 import { formatHours } from "@/lib/format";
 import { STATUS_COLOR, STATUS_LABEL, type DayHours, type DayStatus } from "./status";
 
-const STATUS_ORDER: DayStatus[] = ["MET", "PARTIAL", "ABSENT", "UPCOMING"];
+const STATUS_ORDER: DayStatus[] = ["MET", "PARTIAL", "ABSENT", "ON_LEAVE", "UPCOMING"];
 
 /** A zero-hour day (absent, upcoming, or checked in with nothing elapsed yet) still
  * needs a visible, hoverable mark — a true 0 renders no bar and nothing to hover. */
@@ -32,7 +32,9 @@ function ChartTooltip({ active, payload }: { active?: boolean; payload?: { paylo
       <div className="font-semibold text-navy">{d.label}</div>
       <div className="mt-1 flex items-center gap-1.5">
         <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: STATUS_COLOR[d.status] }} />
-        <span className="font-medium text-navy">{d.inProgress ? "In progress" : formatHours(d.hours)}</span>
+        <span className="font-medium text-navy">
+          {d.status === "ON_LEAVE" ? "—" : d.inProgress ? "In progress" : formatHours(d.hours)}
+        </span>
         <span className="text-slate-400">· {STATUS_LABEL[d.status]}</span>
       </div>
     </div>
@@ -42,7 +44,7 @@ function ChartTooltip({ active, payload }: { active?: boolean; payload?: { paylo
 export function MonthlyHoursChart({ data, targetHours }: { data: DayHours[]; targetHours: number }) {
   const counts = data.reduce<Record<DayStatus, number>>(
     (acc, d) => ({ ...acc, [d.status]: (acc[d.status] ?? 0) + 1 }),
-    { MET: 0, PARTIAL: 0, ABSENT: 0, UPCOMING: 0 }
+    { MET: 0, PARTIAL: 0, ABSENT: 0, ON_LEAVE: 0, UPCOMING: 0 }
   );
   const tickInterval = data.length > 15 ? 1 : 0;
   const chartData: ChartRow[] = data.map((d) => ({ ...d, barValue: Math.max(d.hours, MIN_BAR_HOURS) }));

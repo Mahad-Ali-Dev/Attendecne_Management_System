@@ -14,8 +14,9 @@ import {
   shiftLengthHours,
   shiftMonthKey,
 } from "@/lib/format";
-import type { Attendance } from "@/lib/types";
-import { CalendarCheck, Clock, Target, TrendingUp, ChevronLeft, ChevronRight } from "lucide-react";
+import { leaveDatesSet } from "@/lib/payroll";
+import type { Attendance, LeaveRequest } from "@/lib/types";
+import { CalendarCheck, CalendarOff, Clock, Target, TrendingUp, ChevronLeft, ChevronRight } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -38,14 +39,18 @@ export default async function MonthlyHoursPage({
   const monthStart = `${monthKey}-01`;
   const monthEnd = `${monthKey}-${String(daysInMonth).padStart(2, "0")}`;
 
-  const { data: rows } = await supabase
-    .from("attendance")
-    .select("*")
-    .eq("user_id", profile.id)
-    .gte("work_date", monthStart)
-    .lte("work_date", monthEnd);
+  const [{ data: rows }, { data: leaveData }] = await Promise.all([
+    supabase
+      .from("attendance")
+      .select("*")
+      .eq("user_id", profile.id)
+      .gte("work_date", monthStart)
+      .lte("work_date", monthEnd),
+    supabase.from("leave_requests").select("*").eq("user_id", profile.id).eq("status", "APPROVED"),
+  ]);
 
   const byDate = new Map((rows ?? []).map((r) => [r.work_date, r as Attendance]));
+  const leaveDates = leaveDatesSet((leaveData ?? []) as LeaveRequest[]);
   const shiftHours = shiftLengthHours(profile.shift_start, profile.shift_end);
 
   const days: DayHours[] = [];
@@ -62,6 +67,7 @@ export default async function MonthlyHoursPage({
 
     let status: DayStatus;
     if (dateStr > todayKey) status = "UPCOMING";
+    else if (leaveDates.has(dateStr)) status = "ON_LEAVE"; // excused — takes priority over absent/partial
     else if (!hasCheckedIn) status = "ABSENT";
     else if (inProgress) status = "PARTIAL"; // checked in, not out yet — not final, not "absent"
     else if (hours >= shiftHours) status = "MET";
@@ -77,7 +83,8 @@ export default async function MonthlyHoursPage({
   }
 
   const workingDaysTotal = days.length;
-  const expectedHours = workingDaysTotal * shiftHours;
+  const leaveDaysTotal = days.filter((d) => d.status === "ON_LEAVE").length;
+  const expectedHours = (workingDaysTotal - leaveDaysTotal) * shiftHours;
   const completedHours = days.reduce((sum, d) => sum + d.hours, 0);
   const completionPct = expectedHours > 0 ? Math.round((completedHours / expectedHours) * 100) : 0;
 
@@ -121,6 +128,14 @@ export default async function MonthlyHoursPage({
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard icon={<CalendarCheck className="h-5 w-5" />} label="Working days" value={workingDaysTotal} />
+        {leaveDaysTotal > 0 && (
+          <StatCard
+            icon={<CalendarOff className="h-5 w-5" />}
+            label="On leave"
+            value={leaveDaysTotal}
+            accent="text-brand-600"
+          />
+        )}
         <StatCard icon={<Target className="h-5 w-5" />} label="Expected hours" value={formatHours(expectedHours)} />
         <StatCard
           icon={<Clock className="h-5 w-5" />}
@@ -167,7 +182,11 @@ export default async function MonthlyHoursPage({
                 <tr key={d.date} className="text-slate-600">
                   <td className="px-6 py-3 font-medium text-navy">{d.label}</td>
                   <td className="px-6 py-3">
-                    {d.status === "UPCOMING" ? "—" : d.inProgress ? "In progress" : formatHours(d.hours)}
+                    {d.status === "UPCOMING" || d.status === "ON_LEAVE"
+                      ? "—"
+                      : d.inProgress
+                        ? "In progress"
+                        : formatHours(d.hours)}
                   </td>
                   <td className="px-6 py-3">
                     <span

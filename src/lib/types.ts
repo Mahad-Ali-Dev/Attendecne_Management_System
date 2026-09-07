@@ -40,3 +40,19 @@ export interface SalarySlip {
   note: string | null;
   created_at: string;
 }
+
+export type LeaveType = "SICK" | "CASUAL" | "ANNUAL" | "OTHER";
+export type LeaveStatus = "PENDING" | "APPROVED" | "REJECTED";
+
+export interface LeaveRequest {
+  id: string;
+  user_id: string;
+  start_date: string;
+  end_date: string;
+  leave_type: LeaveType;
+  reason: string | null;
+  status: LeaveStatus;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  created_at: string;
+}

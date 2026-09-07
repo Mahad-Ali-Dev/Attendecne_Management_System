@@ -43,3 +43,22 @@ export async function upsertSalarySlip(
   revalidatePath("/admin/salary");
   return { ok: true };
 }
+
+/** Admin approves or rejects a leave request. */
+export async function reviewLeaveRequest(requestId: string, approve: boolean) {
+  const admin = await requireAdmin();
+  const supabase = createClient();
+
+  const { error } = await supabase
+    .from("leave_requests")
+    .update({
+      status: approve ? "APPROVED" : "REJECTED",
+      reviewed_by: admin.id,
+      reviewed_at: new Date().toISOString(),
+    })
+    .eq("id", requestId);
+
+  if (error) return { error: error.message };
+  revalidatePath("/admin/leave");
+  return { ok: true };
+}

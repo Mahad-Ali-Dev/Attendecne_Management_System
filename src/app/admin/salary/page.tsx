@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { StatCard } from "@/components/StatCard";
 import { PayrollTable } from "./PayrollTable";
 import { formatCurrency, formatMonthLabel, monthKeyOf, pktNow, shiftMonthKey } from "@/lib/format";
-import type { Attendance, Profile, SalarySlip } from "@/lib/types";
+import type { Attendance, LeaveRequest, Profile, SalarySlip } from "@/lib/types";
 import { Users, CheckCircle2, Clock3, Wallet, ChevronLeft, ChevronRight } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -23,17 +23,19 @@ export default async function AdminSalaryPage({
 
   const salaryLookback = new Date(Date.now() - 400 * 86_400_000).toISOString().slice(0, 10);
 
-  const [{ data: profilesData }, { data: slipsData }, { data: attData }] = await Promise.all([
+  const [{ data: profilesData }, { data: slipsData }, { data: attData }, { data: leaveData }] = await Promise.all([
     supabase.from("profiles").select("*").eq("role", "EMPLOYEE").order("full_name"),
     // Every slip, every employee — the table figures out per-employee "this
     // month" vs. "most recent prior" (for carry-forward) on the client.
     supabase.from("salary_slips").select("*").order("month", { ascending: false }),
     supabase.from("attendance").select("*").gte("work_date", salaryLookback),
+    supabase.from("leave_requests").select("*").eq("status", "APPROVED"),
   ]);
 
   const employees = (profilesData ?? []) as Profile[];
   const slips = (slipsData ?? []) as SalarySlip[];
   const attendance = (attData ?? []) as Attendance[];
+  const leaveRequests = (leaveData ?? []) as LeaveRequest[];
 
   const slipsThisMonth = slips.filter((s) => s.month.slice(0, 7) === monthKey);
   const paidCount = slipsThisMonth.length;
@@ -96,7 +98,13 @@ export default async function AdminSalaryPage({
         />
       </div>
 
-      <PayrollTable employees={employees} month={monthKey} slips={slips} attendance={attendance} />
+      <PayrollTable
+        employees={employees}
+        month={monthKey}
+        slips={slips}
+        attendance={attendance}
+        leaveRequests={leaveRequests}
+      />
     </div>
   );
 }

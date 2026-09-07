@@ -3,8 +3,8 @@
 import { useMemo, useState } from "react";
 import { SalaryForm } from "../../SalaryForm";
 import { formatCurrency, formatHours, formatMonthLabel, pktNow } from "@/lib/format";
-import { summarizeMonth } from "@/lib/payroll";
-import type { Attendance, SalarySlip } from "@/lib/types";
+import { summarizeMonth, leaveDatesSet } from "@/lib/payroll";
+import type { Attendance, LeaveRequest, SalarySlip } from "@/lib/types";
 import { Pencil } from "lucide-react";
 
 function netPay(s: { basic_salary: number; allowances: number; deductions: number }) {
@@ -15,16 +15,19 @@ export function SalarySlipEditor({
   employeeId,
   slips,
   attendance,
+  leaveRequests,
   shiftStart,
   shiftEnd,
 }: {
   employeeId: string;
   slips: SalarySlip[];
   attendance: Attendance[];
+  leaveRequests: LeaveRequest[];
   shiftStart: string;
   shiftEnd: string;
 }) {
   const todayKey = useMemo(() => pktNow().toISOString().slice(0, 10), []);
+  const leaveDates = useMemo(() => leaveDatesSet(leaveRequests), [leaveRequests]);
   const [month, setMonth] = useState("");
 
   // `slips` is ordered newest-first, so the first one that isn't the
@@ -63,6 +66,7 @@ export function SalarySlipEditor({
               shiftStart={shiftStart}
               shiftEnd={shiftEnd}
               attendance={attendance}
+              leaveRequests={leaveRequests}
               existingSlip={existingSlip}
               previousSlip={previousSlip}
             />
@@ -88,7 +92,7 @@ export function SalarySlipEditor({
           <tbody className="divide-y divide-slate-50">
             {slips.map((s) => {
               const slipMonthKey = s.month.slice(0, 7);
-              const hist = summarizeMonth(attendance, slipMonthKey, shiftStart, shiftEnd, todayKey);
+              const hist = summarizeMonth(attendance, slipMonthKey, shiftStart, shiftEnd, todayKey, leaveDates);
               return (
                 <tr key={s.id} className="text-slate-600">
                   <td className="px-6 py-3 font-medium text-navy">{formatMonthLabel(slipMonthKey)}</td>
