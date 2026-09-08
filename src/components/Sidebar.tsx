@@ -44,7 +44,7 @@ export function Sidebar({ profile }: { profile: Profile }) {
     <div className="flex h-full flex-col">
       <div className="px-5 py-6">
         <Link href={homeHref} onClick={() => setOpen(false)}>
-          <Logo />
+          <Logo size="lg" />
         </Link>
       </div>
       <nav className="flex-1 space-y-1 px-3">
