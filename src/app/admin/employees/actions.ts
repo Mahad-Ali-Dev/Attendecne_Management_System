@@ -54,8 +54,12 @@ export async function updateEmployeeShift(employeeId: string, shiftStart: string
   if (!timeRe.test(shiftStart) || !timeRe.test(shiftEnd)) {
     return { error: "Invalid time." };
   }
-  if (timeToMinutes(shiftEnd) <= timeToMinutes(shiftStart)) {
-    return { error: "Shift end must be after shift start." };
+  // shift_end <= shift_start is a legitimate overnight shift (e.g. 3 PM to
+  // 2 AM) — shiftLengthHours/isLateCheckIn/upsertAttendance already treat
+  // it that way (wrapping to the next day), so this only rejects the one
+  // genuinely nonsensical case: identical start and end.
+  if (shiftStart === shiftEnd) {
+    return { error: "Shift start and end can't be the same time." };
   }
 
   const { error } = await supabase
