@@ -12,7 +12,7 @@ import {
   ReferenceLine,
 } from "recharts";
 import { formatHours } from "@/lib/format";
-import { STATUS_COLOR, STATUS_LABEL, type DayHours, type DayStatus } from "./status";
+import { STATUS_COLOR, STATUS_LABEL, type DayHours, type DayStatus } from "@/lib/hours";
 
 const STATUS_ORDER: DayStatus[] = ["MET", "PARTIAL", "ABSENT", "ON_LEAVE", "UPCOMING"];
 

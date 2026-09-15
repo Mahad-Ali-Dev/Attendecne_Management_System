@@ -2,53 +2,108 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Avatar } from "@/components/Avatar";
+import { StatCard } from "@/components/StatCard";
+import { MonthlyHoursChart } from "@/components/MonthlyHoursChart";
 import { DeviceMappingForm } from "./DeviceMappingForm";
 import { ShiftEditForm } from "./ShiftEditForm";
 import { AttendanceEditor } from "./AttendanceEditor";
 import { SalarySlipEditor } from "./SalarySlipEditor";
 import { EmployeeLeaveHistory } from "./EmployeeLeaveHistory";
-import { formatDate, formatTimeOfDay } from "@/lib/format";
+import { buildMonthDayHours } from "@/lib/hours";
+import { leaveDatesSet } from "@/lib/payroll";
+import {
+  formatDate,
+  formatHours,
+  formatMonthLabel,
+  formatTimeOfDay,
+  monthKeyOf,
+  pktNow,
+  shiftLengthHours,
+  shiftMonthKey,
+} from "@/lib/format";
 import type { Attendance, LeaveRequest, Profile, SalarySlip } from "@/lib/types";
-import { ArrowLeft, IdCard, Phone, MapPin, Building2, Mail, Briefcase, Clock } from "lucide-react";
+import {
+  ArrowLeft,
+  IdCard,
+  Phone,
+  MapPin,
+  Building2,
+  Mail,
+  Briefcase,
+  Clock,
+  CalendarCheck,
+  CalendarOff,
+  Target,
+  TrendingUp,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
 export default async function EmployeeDetail({
   params,
+  searchParams,
 }: {
   params: { id: string };
+  searchParams: { month?: string };
 }) {
   const supabase = createClient();
 
   const salaryLookback = new Date(Date.now() - 400 * 86_400_000).toISOString().slice(0, 10);
 
-  const [{ data: profileData }, { data: attData }, { data: slipData }, { data: salaryAttData }, { data: leaveData }] =
-    await Promise.all([
-      supabase.from("profiles").select("*").eq("id", params.id).single(),
-      supabase
-        .from("attendance")
-        .select("*")
-        .eq("user_id", params.id)
-        .order("work_date", { ascending: false })
-        .limit(30),
-      supabase
-        .from("salary_slips")
-        .select("*")
-        .eq("user_id", params.id)
-        .order("month", { ascending: false }),
-      // Wider window (not just the last 30 records) so the salary editor can
-      // compute accurate hours-worked-vs-expected for whichever month it's editing.
-      supabase
-        .from("attendance")
-        .select("*")
-        .eq("user_id", params.id)
-        .gte("work_date", salaryLookback),
-      supabase
-        .from("leave_requests")
-        .select("*")
-        .eq("user_id", params.id)
-        .order("start_date", { ascending: false }),
-    ]);
+  const today = pktNow();
+  const todayKey = today.toISOString().slice(0, 10);
+  const currentMonthKey = monthKeyOf(today);
+  const requestedMonth =
+    searchParams.month && /^\d{4}-\d{2}$/.test(searchParams.month) ? searchParams.month : currentMonthKey;
+  const monthKey = requestedMonth > currentMonthKey ? currentMonthKey : requestedMonth; // no browsing into the future
+  const [hoursYear, hoursMonth] = monthKey.split("-").map(Number);
+  const daysInHoursMonth = new Date(Date.UTC(hoursYear, hoursMonth, 0)).getUTCDate();
+  const hoursMonthStart = `${monthKey}-01`;
+  const hoursMonthEnd = `${monthKey}-${String(daysInHoursMonth).padStart(2, "0")}`;
+
+  const [
+    { data: profileData },
+    { data: attData },
+    { data: slipData },
+    { data: salaryAttData },
+    { data: leaveData },
+    { data: hoursAttData },
+  ] = await Promise.all([
+    supabase.from("profiles").select("*").eq("id", params.id).single(),
+    supabase
+      .from("attendance")
+      .select("*")
+      .eq("user_id", params.id)
+      .order("work_date", { ascending: false })
+      .limit(30),
+    supabase
+      .from("salary_slips")
+      .select("*")
+      .eq("user_id", params.id)
+      .order("month", { ascending: false }),
+    // Wider window (not just the last 30 records) so the salary editor can
+    // compute accurate hours-worked-vs-expected for whichever month it's editing.
+    supabase
+      .from("attendance")
+      .select("*")
+      .eq("user_id", params.id)
+      .gte("work_date", salaryLookback),
+    supabase
+      .from("leave_requests")
+      .select("*")
+      .eq("user_id", params.id)
+      .order("start_date", { ascending: false }),
+    // Exact calendar-month slice for the hours chart below — distinct from
+    // both the 30-row-limited `history` and the 400-day salary window.
+    supabase
+      .from("attendance")
+      .select("*")
+      .eq("user_id", params.id)
+      .gte("work_date", hoursMonthStart)
+      .lte("work_date", hoursMonthEnd),
+  ]);
 
   if (!profileData) notFound();
   const emp = profileData as Profile;
@@ -56,6 +111,22 @@ export default async function EmployeeDetail({
   const slips = (slipData ?? []) as SalarySlip[];
   const attendanceForSalary = (salaryAttData ?? []) as Attendance[];
   const leaveRequests = (leaveData ?? []) as LeaveRequest[];
+  const hoursAttendance = (hoursAttData ?? []) as Attendance[];
+
+  const approvedLeaveDates = leaveDatesSet(leaveRequests);
+  const shiftHours = shiftLengthHours(emp.shift_start, emp.shift_end);
+  const hoursDays = buildMonthDayHours(hoursAttendance, monthKey, shiftHours, todayKey, approvedLeaveDates);
+
+  const workingDaysTotal = hoursDays.length;
+  const leaveDaysTotal = hoursDays.filter((d) => d.status === "ON_LEAVE").length;
+  const expectedHours = (workingDaysTotal - leaveDaysTotal) * shiftHours;
+  const completedHours = hoursDays.reduce((sum, d) => sum + d.hours, 0);
+  const completionPct = expectedHours > 0 ? Math.round((completedHours / expectedHours) * 100) : 0;
+
+  const monthLabel = formatMonthLabel(monthKey);
+  const prevMonthKey = shiftMonthKey(monthKey, -1);
+  const nextMonthKey = shiftMonthKey(monthKey, 1);
+  const nextDisabled = nextMonthKey > currentMonthKey;
 
   return (
     <div className="space-y-6">
@@ -65,6 +136,73 @@ export default async function EmployeeDetail({
       >
         <ArrowLeft className="h-4 w-4" /> Back to employees
       </Link>
+
+      {/* Monthly hours */}
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold text-navy">Monthly hours</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Tracked against their {formatHours(shiftHours)} shift ({emp.shift_start.slice(0, 5)}–
+              {emp.shift_end.slice(0, 5)}), Mon–Fri.
+            </p>
+          </div>
+          <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white p-1">
+            <Link
+              href={`/admin/employees/${emp.id}?month=${prevMonthKey}`}
+              className="flex h-8 w-8 items-center justify-center rounded-md text-slate-500 transition hover:bg-slate-100 hover:text-navy"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Link>
+            <span className="min-w-[9rem] text-center text-sm font-semibold text-navy">{monthLabel}</span>
+            {nextDisabled ? (
+              <span className="flex h-8 w-8 items-center justify-center text-slate-200">
+                <ChevronRight className="h-4 w-4" />
+              </span>
+            ) : (
+              <Link
+                href={`/admin/employees/${emp.id}?month=${nextMonthKey}`}
+                className="flex h-8 w-8 items-center justify-center rounded-md text-slate-500 transition hover:bg-slate-100 hover:text-navy"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Link>
+            )}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <StatCard icon={<CalendarCheck className="h-5 w-5" />} label="Working days" value={workingDaysTotal} />
+          {leaveDaysTotal > 0 && (
+            <StatCard
+              icon={<CalendarOff className="h-5 w-5" />}
+              label="On leave"
+              value={leaveDaysTotal}
+              accent="text-brand-600"
+            />
+          )}
+          <StatCard icon={<Target className="h-5 w-5" />} label="Expected hours" value={formatHours(expectedHours)} />
+          <StatCard
+            icon={<Clock className="h-5 w-5" />}
+            label="Hours completed"
+            value={formatHours(completedHours)}
+            accent="text-brand-600"
+          />
+          <StatCard
+            icon={<TrendingUp className="h-5 w-5" />}
+            label="Completion"
+            value={`${completionPct}%`}
+            accent="text-brand-600"
+          />
+        </div>
+
+        <div className="card p-6">
+          {hoursDays.length === 0 ? (
+            <p className="py-10 text-center text-sm text-slate-400">No working days in this month.</p>
+          ) : (
+            <MonthlyHoursChart data={hoursDays} targetHours={shiftHours} />
+          )}
+        </div>
+      </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Profile */}

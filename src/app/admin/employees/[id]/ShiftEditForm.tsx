@@ -27,8 +27,10 @@ export function ShiftEditForm({
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSaved(false);
-    if (end <= start) {
-      setError("Shift end must be after shift start.");
+    // end <= start is a legitimate overnight shift (e.g. 3 PM to 2 AM), not
+    // an error — only identical start/end is actually invalid.
+    if (end === start) {
+      setError("Shift start and end can't be the same time.");
       return;
     }
     setError(null);

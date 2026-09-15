@@ -11,9 +11,12 @@ import { getMyNotifications, markAllNotificationsRead, markNotificationRead } fr
 import type { Notification, Profile } from "@/lib/types";
 import { LayoutDashboard, Users, ShieldCheck, BarChart3, Wallet, CalendarOff, LifeBuoy, Menu, X } from "lucide-react";
 
-// Long-ish on purpose: notifications aren't time-critical, and this fires
-// once for the whole sidebar (see below) rather than once per bell.
-const NOTIFICATION_POLL_MS = 120_000;
+// Long on purpose: this is only a fallback for "sitting on one page for a
+// while" — every normal navigation already re-fetches notifications for
+// free via the layout's own server-side fetch, so this doesn't need to be
+// fast. Also fires once for the whole sidebar (see below) rather than once
+// per bell.
+const NOTIFICATION_POLL_MS = 300_000;
 
 function navItems(isAdmin: boolean) {
   // Admins don't check in/out, so the personal dashboard & hours tracker aren't for them.
@@ -78,7 +81,7 @@ export function Sidebar({
   const body = (
     <div className="flex h-full flex-col">
       <div className="flex items-center justify-between px-5 py-6">
-        <Link href={homeHref} onClick={() => setOpen(false)}>
+        <Link href={homeHref} prefetch={false} onClick={() => setOpen(false)}>
           <Logo size="lg" />
         </Link>
         <NotificationBell
@@ -93,6 +96,7 @@ export function Sidebar({
           <Link
             key={href}
             href={href}
+            prefetch={false}
             onClick={() => setOpen(false)}
             className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition ${
               isActive(pathname, href)
@@ -125,7 +129,7 @@ export function Sidebar({
     <>
       {/* Mobile top bar */}
       <div className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-slate-200 bg-white/80 px-4 backdrop-blur md:hidden">
-        <Link href={homeHref}>
+        <Link href={homeHref} prefetch={false}>
           <Logo />
         </Link>
         <div className="flex items-center gap-1">
