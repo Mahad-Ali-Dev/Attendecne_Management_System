@@ -2,13 +2,11 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/data";
 import { StatCard } from "@/components/StatCard";
-import { MonthlyHoursChart } from "./MonthlyHoursChart";
-import { STATUS_COLOR, STATUS_LABEL, type DayHours, type DayStatus } from "./status";
+import { MonthlyHoursChart } from "@/components/MonthlyHoursChart";
+import { STATUS_COLOR, STATUS_LABEL, buildMonthDayHours } from "@/lib/hours";
 import {
   formatHours,
   formatMonthLabel,
-  hoursDecimal,
-  isWorkingDay,
   monthKeyOf,
   pktNow,
   shiftLengthHours,
@@ -49,38 +47,9 @@ export default async function MonthlyHoursPage({
     supabase.from("leave_requests").select("*").eq("user_id", profile.id).eq("status", "APPROVED"),
   ]);
 
-  const byDate = new Map((rows ?? []).map((r) => [r.work_date, r as Attendance]));
   const leaveDates = leaveDatesSet((leaveData ?? []) as LeaveRequest[]);
   const shiftHours = shiftLengthHours(profile.shift_start, profile.shift_end);
-
-  const days: DayHours[] = [];
-  for (let d = 1; d <= daysInMonth; d++) {
-    const dateObj = new Date(Date.UTC(year, month - 1, d));
-    if (!isWorkingDay(dateObj)) continue;
-
-    const dateStr = `${monthKey}-${String(d).padStart(2, "0")}`;
-    const rec = byDate.get(dateStr);
-    const hasCheckedIn = !!rec?.check_in;
-    const hasCheckedOut = !!rec?.check_out;
-    const inProgress = hasCheckedIn && !hasCheckedOut;
-    const hours = hasCheckedOut ? hoursDecimal(rec!.check_in, rec!.check_out) : 0;
-
-    let status: DayStatus;
-    if (dateStr > todayKey) status = "UPCOMING";
-    else if (leaveDates.has(dateStr)) status = "ON_LEAVE"; // excused — takes priority over absent/partial
-    else if (!hasCheckedIn) status = "ABSENT";
-    else if (inProgress) status = "PARTIAL"; // checked in, not out yet — not final, not "absent"
-    else if (hours >= shiftHours) status = "MET";
-    else status = "PARTIAL";
-
-    days.push({
-      date: dateStr,
-      label: dateObj.toLocaleDateString("en-PK", { weekday: "short", day: "numeric", timeZone: "UTC" }),
-      hours: Math.round(hours * 100) / 100,
-      status,
-      inProgress,
-    });
-  }
+  const days = buildMonthDayHours((rows ?? []) as Attendance[], monthKey, shiftHours, todayKey, leaveDates);
 
   const workingDaysTotal = days.length;
   const leaveDaysTotal = days.filter((d) => d.status === "ON_LEAVE").length;
