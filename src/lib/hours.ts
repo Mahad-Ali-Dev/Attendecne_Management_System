@@ -39,7 +39,8 @@ export function buildMonthDayHours(
   monthKey: string,
   shiftHours: number,
   todayKey: string,
-  leaveDates: Set<string>
+  leaveDates: Set<string>,
+  offDays: number[] = [0, 6]
 ): DayHours[] {
   const [year, month] = monthKey.split("-").map(Number);
   const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
@@ -48,7 +49,7 @@ export function buildMonthDayHours(
   const days: DayHours[] = [];
   for (let d = 1; d <= daysInMonth; d++) {
     const dateObj = new Date(Date.UTC(year, month - 1, d));
-    if (!isWorkingDay(dateObj)) continue;
+    if (!isWorkingDay(dateObj, offDays)) continue;
 
     const dateStr = `${monthKey}-${String(d).padStart(2, "0")}`;
     const rec = byDate.get(dateStr);

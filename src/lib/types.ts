@@ -16,6 +16,8 @@ export interface Profile {
   shift_start: string;
   shift_end: string;
   device_user_id: string | null;
+  /** Days of the week this employee is normally off (0=Sun .. 6=Sat). */
+  off_days: number[];
   created_at: string;
 }
 

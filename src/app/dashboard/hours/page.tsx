@@ -7,6 +7,7 @@ import { STATUS_COLOR, STATUS_LABEL, buildMonthDayHours } from "@/lib/hours";
 import {
   formatHours,
   formatMonthLabel,
+  formatOffDays,
   monthKeyOf,
   pktNow,
   shiftLengthHours,
@@ -49,7 +50,14 @@ export default async function MonthlyHoursPage({
 
   const leaveDates = leaveDatesSet((leaveData ?? []) as LeaveRequest[]);
   const shiftHours = shiftLengthHours(profile.shift_start, profile.shift_end);
-  const days = buildMonthDayHours((rows ?? []) as Attendance[], monthKey, shiftHours, todayKey, leaveDates);
+  const days = buildMonthDayHours(
+    (rows ?? []) as Attendance[],
+    monthKey,
+    shiftHours,
+    todayKey,
+    leaveDates,
+    profile.off_days
+  );
 
   const workingDaysTotal = days.length;
   const leaveDaysTotal = days.filter((d) => d.status === "ON_LEAVE").length;
@@ -69,7 +77,7 @@ export default async function MonthlyHoursPage({
           <h1 className="text-2xl font-bold text-navy">Monthly hours</h1>
           <p className="mt-1 text-sm text-slate-500">
             Tracked against your {formatHours(shiftHours)} shift ({profile.shift_start.slice(0, 5)}–
-            {profile.shift_end.slice(0, 5)}), Mon–Fri.
+            {profile.shift_end.slice(0, 5)}), off {formatOffDays(profile.off_days)}.
           </p>
         </div>
         <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white p-1">
@@ -174,7 +182,7 @@ export default async function MonthlyHoursPage({
       </div>
 
       <p className="text-center text-xs text-slate-400">
-        &quot;Working days&quot; assumes a Mon–Fri week — adjust this if your team works a different schedule.
+        &quot;Working days&quot; excludes your weekly rest days ({formatOffDays(profile.off_days)}).
       </p>
     </div>
   );

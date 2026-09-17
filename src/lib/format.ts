@@ -112,9 +112,25 @@ export function pktNow(): Date {
   return new Date(Date.now() + 5 * 3600 * 1000);
 }
 
-export function isWorkingDay(date: Date): boolean {
-  const day = date.getUTCDay();
-  return day !== 0 && day !== 6; // Mon–Fri
+/**
+ * Whether `date` is a working day for an employee whose weekly rest days
+ * are `offDays` (0=Sun .. 6=Sat, matching Date.getUTCDay()). Defaults to
+ * the standard Sat+Sun weekend for callers that don't have a specific
+ * employee's schedule on hand.
+ */
+export function isWorkingDay(date: Date, offDays: number[] = [0, 6]): boolean {
+  return !offDays.includes(date.getUTCDay());
+}
+
+const WEEKDAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+/** Formats weekday-off values (0=Sun..6=Sat) as e.g. "Sat, Sun". */
+export function formatOffDays(offDays: number[]): string {
+  if (offDays.length === 0) return "None";
+  return [...offDays]
+    .sort((a, b) => a - b)
+    .map((d) => WEEKDAY_NAMES[d])
+    .join(", ");
 }
 
 export function monthKeyOf(date: Date): string {

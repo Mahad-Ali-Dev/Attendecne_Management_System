@@ -6,6 +6,7 @@ import { StatCard } from "@/components/StatCard";
 import { MonthlyHoursChart } from "@/components/MonthlyHoursChart";
 import { DeviceMappingForm } from "./DeviceMappingForm";
 import { ShiftEditForm } from "./ShiftEditForm";
+import { OffDaysEditForm } from "./OffDaysEditForm";
 import { AttendanceEditor } from "./AttendanceEditor";
 import { SalarySlipEditor } from "./SalarySlipEditor";
 import { EmployeeLeaveHistory } from "./EmployeeLeaveHistory";
@@ -15,6 +16,7 @@ import {
   formatDate,
   formatHours,
   formatMonthLabel,
+  formatOffDays,
   formatTimeOfDay,
   monthKeyOf,
   pktNow,
@@ -106,7 +108,9 @@ export default async function EmployeeDetail({
   ]);
 
   if (!profileData) notFound();
-  const emp = profileData as Profile;
+  // Defensive default: guards against off_days being undefined right after
+  // a deploy but before schema.sql has been re-run to add the column.
+  const emp = { ...profileData, off_days: profileData.off_days ?? [0, 6] } as Profile;
   const history = (attData ?? []) as Attendance[];
   const slips = (slipData ?? []) as SalarySlip[];
   const attendanceForSalary = (salaryAttData ?? []) as Attendance[];
@@ -115,7 +119,14 @@ export default async function EmployeeDetail({
 
   const approvedLeaveDates = leaveDatesSet(leaveRequests);
   const shiftHours = shiftLengthHours(emp.shift_start, emp.shift_end);
-  const hoursDays = buildMonthDayHours(hoursAttendance, monthKey, shiftHours, todayKey, approvedLeaveDates);
+  const hoursDays = buildMonthDayHours(
+    hoursAttendance,
+    monthKey,
+    shiftHours,
+    todayKey,
+    approvedLeaveDates,
+    emp.off_days
+  );
 
   const workingDaysTotal = hoursDays.length;
   const leaveDaysTotal = hoursDays.filter((d) => d.status === "ON_LEAVE").length;
@@ -144,7 +155,7 @@ export default async function EmployeeDetail({
             <h2 className="text-lg font-semibold text-navy">Monthly hours</h2>
             <p className="mt-1 text-sm text-slate-500">
               Tracked against their {formatHours(shiftHours)} shift ({emp.shift_start.slice(0, 5)}–
-              {emp.shift_end.slice(0, 5)}), Mon–Fri.
+              {emp.shift_end.slice(0, 5)}), off {formatOffDays(emp.off_days)}.
             </p>
           </div>
           <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white p-1">
@@ -226,10 +237,12 @@ export default async function EmployeeDetail({
               label="Shift"
               value={`${formatTimeOfDay(emp.shift_start)} – ${formatTimeOfDay(emp.shift_end)}`}
             />
+            <Row icon={<CalendarOff className="h-4 w-4" />} label="Rest days" value={formatOffDays(emp.off_days)} />
             <Row icon={<MapPin className="h-4 w-4" />} label="Address" value={emp.address} />
           </dl>
 
           <ShiftEditForm employeeId={emp.id} initialStart={emp.shift_start} initialEnd={emp.shift_end} />
+          <OffDaysEditForm employeeId={emp.id} initialOffDays={emp.off_days} />
           <DeviceMappingForm employeeId={emp.id} initialValue={emp.device_user_id} />
 
           <p className="mt-4 border-t border-slate-50 pt-4 text-xs text-slate-400">
@@ -245,6 +258,7 @@ export default async function EmployeeDetail({
           leaveRequests={leaveRequests}
           shiftStart={emp.shift_start}
           shiftEnd={emp.shift_end}
+          offDays={emp.off_days}
         />
         <EmployeeLeaveHistory requests={leaveRequests} />
       </div>

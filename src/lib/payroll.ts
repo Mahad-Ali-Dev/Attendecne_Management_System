@@ -34,7 +34,8 @@ export function summarizeMonth(
   shiftStart: string,
   shiftEnd: string,
   todayKey: string,
-  leaveDates: Set<string> = new Set()
+  leaveDates: Set<string> = new Set(),
+  offDays: number[] = [0, 6]
 ): MonthAttendanceSummary {
   const [year, month] = monthKey.split("-").map(Number);
   const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
@@ -46,7 +47,7 @@ export function summarizeMonth(
   let actualHours = 0;
   for (let d = 1; d <= daysInMonth; d++) {
     const dateObj = new Date(Date.UTC(year, month - 1, d));
-    if (!isWorkingDay(dateObj)) continue;
+    if (!isWorkingDay(dateObj, offDays)) continue;
     const dateStr = `${monthKey}-${String(d).padStart(2, "0")}`;
     if (dateStr > todayKey) continue;
     workingDays++;

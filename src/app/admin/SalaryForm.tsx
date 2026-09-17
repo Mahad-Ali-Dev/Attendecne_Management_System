@@ -19,6 +19,7 @@ export function SalaryForm({
   month,
   shiftStart,
   shiftEnd,
+  offDays,
   attendance,
   leaveRequests = [],
   existingSlip,
@@ -29,6 +30,7 @@ export function SalaryForm({
   month: string;
   shiftStart: string;
   shiftEnd: string;
+  offDays?: number[];
   attendance: Attendance[];
   leaveRequests?: LeaveRequest[];
   existingSlip?: SalarySlip;
@@ -50,8 +52,8 @@ export function SalaryForm({
 
   const leaveDates = useMemo(() => leaveDatesSet(leaveRequests), [leaveRequests]);
   const summary = useMemo(
-    () => summarizeMonth(attendance, month, shiftStart, shiftEnd, todayKey, leaveDates),
-    [attendance, month, shiftStart, shiftEnd, todayKey, leaveDates]
+    () => summarizeMonth(attendance, month, shiftStart, shiftEnd, todayKey, leaveDates, offDays),
+    [attendance, month, shiftStart, shiftEnd, todayKey, leaveDates, offDays]
   );
 
   const basicSalaryNum = Number(basicSalary) || 0;

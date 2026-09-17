@@ -25,7 +25,11 @@ export const getCurrentProfile = cache(async (): Promise<Profile> => {
     .single();
 
   if (!profile) redirect("/login");
-  return profile as Profile;
+  // Defensive default: profiles rows created before off_days existed (or
+  // read right after a deploy but before schema.sql has been re-run to add
+  // the column) would otherwise come back with off_days undefined, and
+  // every caller assumes a real array.
+  return { ...profile, off_days: profile.off_days ?? [0, 6] } as Profile;
 });
 
 /** Like getCurrentProfile but also enforces the ADMIN role. */
