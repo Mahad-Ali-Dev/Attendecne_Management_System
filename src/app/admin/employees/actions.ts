@@ -83,7 +83,7 @@ export async function updateEmployeeOffDays(employeeId: string, offDays: number[
   await requireAdmin();
   const supabase = createClient();
 
-  const cleaned = [...new Set(offDays)].filter((d) => Number.isInteger(d) && d >= 0 && d <= 6);
+  const cleaned = Array.from(new Set(offDays)).filter((d) => Number.isInteger(d) && d >= 0 && d <= 6);
   if (cleaned.length === 7) {
     return { error: "At least one day has to be a working day." };
   }
