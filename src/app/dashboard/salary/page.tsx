@@ -55,7 +55,7 @@ export default async function SalarySlipPage({
   let onLeave = 0;
   for (let d = 1; d <= daysInMonth; d++) {
     const dateObj = new Date(Date.UTC(year, month - 1, d));
-    if (!isWorkingDay(dateObj)) continue;
+    if (!isWorkingDay(dateObj, profile.off_days)) continue;
     const dateStr = `${monthKey}-${String(d).padStart(2, "0")}`;
     if (dateStr > todayKey) continue; // don't count days that haven't happened yet
     workingDays++;

@@ -18,6 +18,7 @@ export function SalarySlipEditor({
   leaveRequests,
   shiftStart,
   shiftEnd,
+  offDays,
 }: {
   employeeId: string;
   slips: SalarySlip[];
@@ -25,6 +26,7 @@ export function SalarySlipEditor({
   leaveRequests: LeaveRequest[];
   shiftStart: string;
   shiftEnd: string;
+  offDays?: number[];
 }) {
   const todayKey = useMemo(() => pktNow().toISOString().slice(0, 10), []);
   const leaveDates = useMemo(() => leaveDatesSet(leaveRequests), [leaveRequests]);
@@ -65,6 +67,7 @@ export function SalarySlipEditor({
               month={month}
               shiftStart={shiftStart}
               shiftEnd={shiftEnd}
+              offDays={offDays}
               attendance={attendance}
               leaveRequests={leaveRequests}
               existingSlip={existingSlip}
@@ -92,7 +95,7 @@ export function SalarySlipEditor({
           <tbody className="divide-y divide-slate-50">
             {slips.map((s) => {
               const slipMonthKey = s.month.slice(0, 7);
-              const hist = summarizeMonth(attendance, slipMonthKey, shiftStart, shiftEnd, todayKey, leaveDates);
+              const hist = summarizeMonth(attendance, slipMonthKey, shiftStart, shiftEnd, todayKey, leaveDates, offDays);
               return (
                 <tr key={s.id} className="text-slate-600">
                   <td className="px-6 py-3 font-medium text-navy">{formatMonthLabel(slipMonthKey)}</td>

@@ -133,6 +133,7 @@ export function PayrollTable({
                         month={month}
                         shiftStart={emp.shift_start}
                         shiftEnd={emp.shift_end}
+                        offDays={emp.off_days}
                         attendance={attendanceByUser.get(emp.id) ?? []}
                         leaveRequests={leaveByUser.get(emp.id) ?? []}
                         existingSlip={slip}

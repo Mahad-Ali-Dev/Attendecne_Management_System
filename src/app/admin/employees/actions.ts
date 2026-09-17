@@ -73,6 +73,30 @@ export async function updateEmployeeShift(employeeId: string, shiftStart: string
   return { ok: true };
 }
 
+/**
+ * Admin sets which weekdays an employee is normally off (0=Sun..6=Sat) —
+ * e.g. someone who rests on weekdays and works the weekend instead of the
+ * standard Sat+Sun. Affects every "working days"/expected-hours
+ * calculation (Monthly Hours, salary) going forward.
+ */
+export async function updateEmployeeOffDays(employeeId: string, offDays: number[]) {
+  await requireAdmin();
+  const supabase = createClient();
+
+  const cleaned = [...new Set(offDays)].filter((d) => Number.isInteger(d) && d >= 0 && d <= 6);
+  if (cleaned.length === 7) {
+    return { error: "At least one day has to be a working day." };
+  }
+
+  const { error } = await supabase.from("profiles").update({ off_days: cleaned }).eq("id", employeeId);
+
+  if (error) return { error: error.message };
+  revalidatePath(`/admin/employees/${employeeId}`);
+  revalidatePath("/admin/salary");
+  revalidatePath("/dashboard/hours");
+  return { ok: true };
+}
+
 /** Builds a UTC ISO timestamp from a PKT (UTC+5) work date + wall-clock time. */
 function pktToISOString(workDate: string, time: string): string {
   return new Date(`${workDate}T${time}:00+05:00`).toISOString();

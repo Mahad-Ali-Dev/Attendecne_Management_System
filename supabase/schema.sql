@@ -20,6 +20,12 @@ create table if not exists public.profiles (
   shift_start     time        not null default '09:00',
   shift_end       time        not null default '17:00',
   device_user_id  text        unique,
+  -- Days of the week this employee is normally OFF, as JS Date.getUTCDay()
+  -- values (0=Sun .. 6=Sat). Defaults to the standard Sat+Sun weekend; an
+  -- employee who instead rests on weekdays and works the weekend gets a
+  -- different set here so their weekend hours count toward their totals
+  -- instead of being silently skipped as "not a working day".
+  off_days        integer[]   not null default '{0,6}',
   created_at      timestamptz not null default now()
 );
 
@@ -29,6 +35,9 @@ alter table public.profiles add column if not exists shift_end   time not null d
 -- Maps a profile to the numeric "user ID" it was assigned during fingerprint
 -- enrollment on the ZKTeco K50 terminal itself. Set by an admin, not at registration.
 alter table public.profiles add column if not exists device_user_id text unique;
+-- Employees registered before custom weekly schedules existed still default
+-- to the standard Sat+Sun weekend.
+alter table public.profiles add column if not exists off_days integer[] not null default '{0,6}';
 
 -- ---------------------------------------------------------------------------
 -- 2. ATTENDANCE  (one row per employee per day)
