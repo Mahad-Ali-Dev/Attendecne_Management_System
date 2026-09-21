@@ -92,3 +92,45 @@ export interface Complaint {
   resolved_at: string | null;
   created_at: string;
 }
+
+/**
+ * Browser-activity tracker data — written by a separate tracking tool
+ * (its own extension/agent), not by this app. These types just describe
+ * what's read from those tables; this app only ever writes to
+ * site_categories (admin categorization), never to the other two.
+ */
+export interface ProductivitySession {
+  id: string;
+  user_id: string;
+  work_date: string;
+  total_productive_seconds: number;
+  total_unproductive_seconds: number;
+  tab_switch_count: number;
+  flagged_suspicious: boolean;
+  flag_reason: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type SiteCategoryValue = "PRODUCTIVE" | "NEUTRAL" | "DISTRACTING" | "UNCATEGORIZED";
+
+export interface SiteActivity {
+  id: string;
+  user_id: string;
+  work_date: string;
+  hostname: string;
+  category: SiteCategoryValue;
+  productive_seconds: number;
+  unproductive_seconds: number;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Admin-managed hostname → category mapping the tracker consults going forward. */
+export interface SiteCategory {
+  id: string;
+  hostname: string;
+  category: Exclude<SiteCategoryValue, "UNCATEGORIZED">;
+  created_by: string | null;
+  created_at: string;
+}
