@@ -24,6 +24,7 @@ export function EmployeeProductivity({ sessions, sites }: { sessions: Productivi
           <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-400">
             <tr>
               <th className="px-6 py-3 font-medium">Date</th>
+              <th className="px-6 py-3 font-medium">Total tracked</th>
               <th className="px-6 py-3 font-medium">Productive</th>
               <th className="px-6 py-3 font-medium">Unproductive</th>
               <th className="px-6 py-3 font-medium">Productivity</th>
@@ -41,6 +42,9 @@ export function EmployeeProductivity({ sessions, sites }: { sessions: Productivi
                   className="cursor-pointer text-slate-600 hover:bg-slate-50"
                 >
                   <td className="px-6 py-3 font-medium text-navy">{formatDate(s.work_date)}</td>
+                  <td className="px-6 py-3 font-medium text-navy">
+                    {formatHours((s.total_productive_seconds + s.total_unproductive_seconds) / 3600)}
+                  </td>
                   <td className="px-6 py-3 text-emerald-600">{formatHours(s.total_productive_seconds / 3600)}</td>
                   <td className="px-6 py-3 text-amber-600">{formatHours(s.total_unproductive_seconds / 3600)}</td>
                   <td className="px-6 py-3 font-medium text-navy">{pct === null ? "—" : `${pct}%`}</td>

@@ -6,7 +6,6 @@ import { SiteBreakdownModal } from "@/components/SiteBreakdownModal";
 import { productivityPercent } from "@/lib/productivity";
 import { formatHours } from "@/lib/format";
 import type { Profile, ProductivitySession, SiteActivity } from "@/lib/types";
-import { AlertTriangle } from "lucide-react";
 
 export function ProductivityOverviewTable({
   employees,
@@ -30,14 +29,28 @@ export function ProductivityOverviewTable({
     return map;
   }, [sites]);
 
-  // Flagged first, then tracked, then not-tracked — each group keeps the
-  // incoming alphabetical order since Array.sort is stable.
+  // Hostname with the most total time per user, derived from the same
+  // site_activity rows already fetched for the drill-down modal below —
+  // no separate query needed.
+  const topSiteByUser = useMemo(() => {
+    const map = new Map<string, string>();
+    sitesByUser.forEach((list, userId) => {
+      let top: SiteActivity | null = null;
+      for (const site of list) {
+        const total = site.productive_seconds + site.unproductive_seconds;
+        const topTotal = top ? top.productive_seconds + top.unproductive_seconds : -1;
+        if (total > topTotal) top = site;
+      }
+      if (top) map.set(userId, top.hostname);
+    });
+    return map;
+  }, [sitesByUser]);
+
+  // Tracked first, then not-tracked — each group keeps the incoming
+  // alphabetical order since Array.sort is stable.
   const sorted = useMemo(() => {
     function rank(emp: Profile) {
-      const s = sessionByUser.get(emp.id);
-      if (s?.flagged_suspicious) return 0;
-      if (s) return 1;
-      return 2;
+      return sessionByUser.has(emp.id) ? 0 : 1;
     }
     return [...employees].sort((a, b) => rank(a) - rank(b));
   }, [employees, sessionByUser]);
@@ -61,7 +74,7 @@ export function ProductivityOverviewTable({
               <th className="px-6 py-3 font-medium">Productive</th>
               <th className="px-6 py-3 font-medium">Unproductive</th>
               <th className="px-6 py-3 font-medium">Productivity</th>
-              <th className="px-6 py-3 font-medium">Status</th>
+              <th className="px-6 py-3 font-medium">Top site</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
@@ -94,17 +107,7 @@ export function ProductivityOverviewTable({
                     {s ? formatHours(s.total_unproductive_seconds / 3600) : "—"}
                   </td>
                   <td className="px-6 py-3 font-medium text-navy">{pct === null ? "—" : `${pct}%`}</td>
-                  <td className="px-6 py-3">
-                    {s?.flagged_suspicious ? (
-                      <span className="badge bg-red-50 text-red-700">
-                        <AlertTriangle className="h-3 w-3" /> Flagged
-                      </span>
-                    ) : s ? (
-                      <span className="badge bg-emerald-50 text-emerald-700">Tracked</span>
-                    ) : (
-                      <span className="text-slate-400">Not tracked</span>
-                    )}
-                  </td>
+                  <td className="px-6 py-3 text-slate-500">{topSiteByUser.get(emp.id) ?? "—"}</td>
                 </tr>
               );
             })}
