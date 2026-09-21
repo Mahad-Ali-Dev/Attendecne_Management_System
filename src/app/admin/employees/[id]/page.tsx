@@ -10,6 +10,7 @@ import { OffDaysEditForm } from "./OffDaysEditForm";
 import { AttendanceEditor } from "./AttendanceEditor";
 import { SalarySlipEditor } from "./SalarySlipEditor";
 import { EmployeeLeaveHistory } from "./EmployeeLeaveHistory";
+import { EmployeeProductivity } from "./EmployeeProductivity";
 import { buildMonthDayHours } from "@/lib/hours";
 import { leaveDatesSet } from "@/lib/payroll";
 import {
@@ -23,7 +24,7 @@ import {
   shiftLengthHours,
   shiftMonthKey,
 } from "@/lib/format";
-import type { Attendance, LeaveRequest, Profile, SalarySlip } from "@/lib/types";
+import type { Attendance, LeaveRequest, Profile, ProductivitySession, SalarySlip, SiteActivity } from "@/lib/types";
 import {
   ArrowLeft,
   IdCard,
@@ -72,6 +73,8 @@ export default async function EmployeeDetail({
     { data: salaryAttData },
     { data: leaveData },
     { data: hoursAttData },
+    { data: sessionsData },
+    { data: sitesData },
   ] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", params.id).single(),
     supabase
@@ -105,6 +108,20 @@ export default async function EmployeeDetail({
       .eq("user_id", params.id)
       .gte("work_date", hoursMonthStart)
       .lte("work_date", hoursMonthEnd),
+    // Same month window as the hours chart above, for the Productivity section.
+    supabase
+      .from("productivity_sessions")
+      .select("*")
+      .eq("user_id", params.id)
+      .gte("work_date", hoursMonthStart)
+      .lte("work_date", hoursMonthEnd)
+      .order("work_date", { ascending: false }),
+    supabase
+      .from("site_activity")
+      .select("*")
+      .eq("user_id", params.id)
+      .gte("work_date", hoursMonthStart)
+      .lte("work_date", hoursMonthEnd),
   ]);
 
   if (!profileData) notFound();
@@ -116,6 +133,8 @@ export default async function EmployeeDetail({
   const attendanceForSalary = (salaryAttData ?? []) as Attendance[];
   const leaveRequests = (leaveData ?? []) as LeaveRequest[];
   const hoursAttendance = (hoursAttData ?? []) as Attendance[];
+  const productivitySessions = (sessionsData ?? []) as ProductivitySession[];
+  const productivitySites = (sitesData ?? []) as SiteActivity[];
 
   const approvedLeaveDates = leaveDatesSet(leaveRequests);
   const shiftHours = shiftLengthHours(emp.shift_start, emp.shift_end);
@@ -214,6 +233,8 @@ export default async function EmployeeDetail({
           )}
         </div>
       </div>
+
+      <EmployeeProductivity sessions={productivitySessions} sites={productivitySites} />
 
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Profile */}

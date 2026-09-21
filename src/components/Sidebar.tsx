@@ -9,7 +9,7 @@ import { SignOutButton } from "@/components/SignOutButton";
 import { NotificationBell } from "@/components/NotificationBell";
 import { getMyNotifications, markAllNotificationsRead, markNotificationRead } from "@/app/actions/notifications";
 import type { Notification, Profile } from "@/lib/types";
-import { LayoutDashboard, Users, ShieldCheck, BarChart3, Wallet, CalendarOff, LifeBuoy, Menu, X } from "lucide-react";
+import { LayoutDashboard, Users, ShieldCheck, BarChart3, Wallet, CalendarOff, LifeBuoy, Activity, Menu, X } from "lucide-react";
 
 // Long on purpose: this is only a fallback for "sitting on one page for a
 // while" — every normal navigation already re-fetches notifications for
@@ -24,6 +24,7 @@ function navItems(isAdmin: boolean) {
     return [
       { href: "/admin", label: "Admin", icon: ShieldCheck },
       { href: "/admin/employees", label: "Employees", icon: Users },
+      { href: "/admin/productivity", label: "Productivity", icon: Activity },
       { href: "/admin/salary", label: "Salary", icon: Wallet },
       { href: "/admin/leave", label: "Leave", icon: CalendarOff },
       { href: "/admin/support", label: "Support", icon: LifeBuoy },
@@ -32,6 +33,7 @@ function navItems(isAdmin: boolean) {
   return [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { href: "/dashboard/hours", label: "Monthly Hours", icon: BarChart3 },
+    { href: "/dashboard/productivity", label: "Productivity", icon: Activity },
     { href: "/dashboard/salary", label: "Salary Slip", icon: Wallet },
     { href: "/dashboard/leave", label: "Leave", icon: CalendarOff },
     { href: "/dashboard/support", label: "Support", icon: LifeBuoy },
