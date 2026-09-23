@@ -27,6 +27,11 @@ export function leaveDatesSet(leaveRequests: LeaveRequest[]): Set<string> {
  * in-progress month shouldn't be penalized for days that haven't happened.
  * Days covered by an approved leave request are excused entirely: they
  * don't add to expected hours, so they can never create a shortfall.
+ *
+ * A rest day (the employee's weekly off day) never adds to `workingDays` —
+ * expected hours stay anchored to the normal roster — but if they worked it
+ * anyway, those hours ARE credited to `actualHours`, as bonus hours that can
+ * only reduce a shortfall, never inflate the target.
  */
 export function summarizeMonth(
   attendance: Attendance[],
@@ -47,16 +52,22 @@ export function summarizeMonth(
   let actualHours = 0;
   for (let d = 1; d <= daysInMonth; d++) {
     const dateObj = new Date(Date.UTC(year, month - 1, d));
-    if (!isWorkingDay(dateObj, offDays)) continue;
     const dateStr = `${monthKey}-${String(d).padStart(2, "0")}`;
     if (dateStr > todayKey) continue;
-    workingDays++;
-    if (leaveDates.has(dateStr)) {
-      leaveDays++;
-      continue;
-    }
+
     const rec = byDate.get(dateStr);
-    if (rec) actualHours += hoursDecimal(rec.check_in, rec.check_out);
+    if (isWorkingDay(dateObj, offDays)) {
+      workingDays++;
+      if (leaveDates.has(dateStr)) {
+        leaveDays++;
+        continue;
+      }
+      if (rec) actualHours += hoursDecimal(rec.check_in, rec.check_out);
+    } else if (rec) {
+      // Worked a rest day: bonus hours, credited without counting the day
+      // itself as a working day (so expected hours don't move).
+      actualHours += hoursDecimal(rec.check_in, rec.check_out);
+    }
   }
 
   const expectedHours = (workingDays - leaveDays) * shiftHours;

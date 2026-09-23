@@ -6,7 +6,7 @@ import { ProductivityOverviewTable } from "./ProductivityOverviewTable";
 import { NeedsCategorization } from "./NeedsCategorization";
 import { FlaggedSessionsPanel } from "./FlaggedSessionsPanel";
 import { pktNow } from "@/lib/format";
-import type { Profile, ProductivitySession, SiteActivity, SiteCategory } from "@/lib/types";
+import type { AppActivity, Profile, ProductivitySession, SiteActivity, SiteCategory } from "@/lib/types";
 import { Users, TrendingUp, AlertTriangle } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -32,6 +32,7 @@ export default async function AdminProductivityPage({ searchParams }: { searchPa
     { data: profilesData },
     { data: sessionsData },
     { data: sitesData },
+    { data: appsData },
     { data: uncategorizedData },
     { data: categoriesData },
     { data: flaggedData },
@@ -39,6 +40,9 @@ export default async function AdminProductivityPage({ searchParams }: { searchPa
     supabase.from("profiles").select("*").eq("role", "EMPLOYEE").order("full_name"),
     supabase.from("productivity_sessions").select("*").eq("work_date", dateKey),
     supabase.from("site_activity").select("*").eq("work_date", dateKey),
+    // Desktop-agent per-app data — the "Top App" column's source (site_activity
+    // is the retired browser-extension design and won't have current data).
+    supabase.from("app_activity").select("*").eq("work_date", dateKey),
     supabase
       .from("site_activity")
       .select("hostname")
@@ -56,6 +60,7 @@ export default async function AdminProductivityPage({ searchParams }: { searchPa
   const employees = (profilesData ?? []) as Profile[];
   const sessions = (sessionsData ?? []) as ProductivitySession[];
   const sites = (sitesData ?? []) as SiteActivity[];
+  const apps = (appsData ?? []) as AppActivity[];
   const categorized = new Set(((categoriesData ?? []) as SiteCategory[]).map((c) => c.hostname));
   const needsCategorization = Array.from(
     new Set(
@@ -97,7 +102,7 @@ export default async function AdminProductivityPage({ searchParams }: { searchPa
         />
       </div>
 
-      <ProductivityOverviewTable employees={employees} sessions={sessions} sites={sites} />
+      <ProductivityOverviewTable employees={employees} sessions={sessions} sites={sites} apps={apps} />
 
       <div className="grid gap-6 lg:grid-cols-2">
         <NeedsCategorization hostnames={needsCategorization} />

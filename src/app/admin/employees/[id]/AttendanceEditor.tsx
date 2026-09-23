@@ -6,6 +6,7 @@ import { upsertAttendance, deleteAttendance } from "../actions";
 import { Modal } from "@/components/Modal";
 import { StatusBadge } from "@/components/StatusBadge";
 import { formatDate, formatTime, hoursBetween, isoToPktTimeInput, todayISO } from "@/lib/format";
+import type { AttendanceHistoryEntry } from "@/lib/hours";
 import type { Attendance } from "@/lib/types";
 import { Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 
@@ -15,7 +16,15 @@ interface EditState {
   checkOut: string;
 }
 
-export function AttendanceEditor({ employeeId, history }: { employeeId: string; history: Attendance[] }) {
+export function AttendanceEditor({
+  employeeId,
+  entries,
+  monthLabel,
+}: {
+  employeeId: string;
+  entries: AttendanceHistoryEntry[];
+  monthLabel: string;
+}) {
   const router = useRouter();
   const [modal, setModal] = useState<EditState | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Attendance | null>(null);
@@ -29,8 +38,16 @@ export function AttendanceEditor({ employeeId, history }: { employeeId: string; 
     setError(null);
   }
 
-  function openEdit(r: Attendance) {
-    setModal({ date: r.work_date, checkIn: isoToPktTimeInput(r.check_in), checkOut: isoToPktTimeInput(r.check_out) });
+  function openEditEntry(entry: AttendanceHistoryEntry) {
+    if (entry.record) {
+      setModal({
+        date: entry.record.work_date,
+        checkIn: isoToPktTimeInput(entry.record.check_in),
+        checkOut: isoToPktTimeInput(entry.record.check_out),
+      });
+    } else {
+      setModal({ date: entry.date, checkIn: "", checkOut: "" });
+    }
     setError(null);
   }
 
@@ -78,7 +95,7 @@ export function AttendanceEditor({ employeeId, history }: { employeeId: string; 
       <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
         <div>
           <h2 className="font-semibold text-navy">Attendance history</h2>
-          <p className="text-xs text-slate-400">Last 30 records</p>
+          <p className="text-xs text-slate-400">{monthLabel}</p>
         </div>
         <button
           onClick={openAdd}
@@ -88,7 +105,7 @@ export function AttendanceEditor({ employeeId, history }: { employeeId: string; 
         </button>
       </div>
 
-      {history.length === 0 ? (
+      {entries.length === 0 ? (
         <p className="px-6 py-10 text-center text-sm text-slate-400">No attendance recorded yet.</p>
       ) : (
         <table className="w-full text-sm">
@@ -103,35 +120,51 @@ export function AttendanceEditor({ employeeId, history }: { employeeId: string; 
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
-            {history.map((r) => (
-              <tr key={r.id} className="text-slate-600">
-                <td className="px-6 py-3 font-medium text-navy">{formatDate(r.work_date)}</td>
-                <td className="px-6 py-3">{formatTime(r.check_in)}</td>
-                <td className="px-6 py-3">{formatTime(r.check_out)}</td>
-                <td className="px-6 py-3">{hoursBetween(r.check_in, r.check_out)}</td>
-                <td className="px-6 py-3">
-                  <StatusBadge status={r.status} />
-                </td>
-                <td className="px-6 py-3">
-                  <div className="flex items-center justify-end gap-1">
-                    <button
-                      onClick={() => openEdit(r)}
-                      aria-label={`Edit ${r.work_date}`}
-                      className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-navy"
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                    </button>
-                    <button
-                      onClick={() => openDelete(r)}
-                      aria-label={`Delete ${r.work_date}`}
-                      className="rounded-lg p-1.5 text-slate-400 transition hover:bg-red-50 hover:text-red-600"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
+            {entries.map((entry) => {
+              const r = entry.record;
+              const status = entry.isOnLeave ? "ON_LEAVE" : r ? r.status : entry.isRestDay ? "REST_DAY" : "ABSENT";
+              return (
+                <tr
+                  key={entry.date}
+                  className={`text-slate-600 ${entry.isOnLeave ? "bg-blue-50" : ""}`}
+                >
+                  <td className="px-6 py-3 font-medium text-navy">
+                    {formatDate(entry.date)}
+                    {entry.isRestDay && !entry.isOnLeave && (
+                      <span className="ml-2 text-xs font-normal text-violet-500">Weekend</span>
+                    )}
+                  </td>
+                  <td className="px-6 py-3">{formatTime(r?.check_in ?? null)}</td>
+                  <td className="px-6 py-3">{formatTime(r?.check_out ?? null)}</td>
+                  <td className="px-6 py-3">{hoursBetween(r?.check_in ?? null, r?.check_out ?? null)}</td>
+                  <td className="px-6 py-3">
+                    <StatusBadge status={status} />
+                  </td>
+                  <td className="px-6 py-3">
+                    <div className="flex items-center justify-end gap-1">
+                      {!entry.isOnLeave && (
+                        <button
+                          onClick={() => openEditEntry(entry)}
+                          aria-label={`Edit ${entry.date}`}
+                          className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-navy"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                      {r && (
+                        <button
+                          onClick={() => openDelete(r)}
+                          aria-label={`Delete ${entry.date}`}
+                          className="rounded-lg p-1.5 text-slate-400 transition hover:bg-red-50 hover:text-red-600"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       )}

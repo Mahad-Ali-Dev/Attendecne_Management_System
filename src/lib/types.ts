@@ -126,6 +126,23 @@ export interface SiteActivity {
   updated_at: string;
 }
 
+/**
+ * Desktop-agent per-application activity — the successor to SiteActivity
+ * now that tracking isn't browser-extension-only. No category concept
+ * (unlike SiteActivity); app_name is a raw executable basename, e.g.
+ * "chrome.exe" — see formatAppName() in @/lib/productivity for display.
+ */
+export interface AppActivity {
+  id: string;
+  user_id: string;
+  work_date: string;
+  app_name: string;
+  productive_seconds: number;
+  unproductive_seconds: number;
+  created_at: string;
+  updated_at: string;
+}
+
 /** Admin-managed hostname → category mapping the tracker consults going forward. */
 export interface SiteCategory {
   id: string;

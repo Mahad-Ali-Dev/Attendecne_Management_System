@@ -6,7 +6,9 @@ import { ChangePasswordButton } from "./ChangePasswordButton";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Avatar } from "@/components/Avatar";
 import { formatDate, formatTime, formatTimeOfDay, hoursBetween } from "@/lib/format";
-import type { Attendance } from "@/lib/types";
+import { buildAttendanceHistory } from "@/lib/hours";
+import { leaveDatesSet } from "@/lib/payroll";
+import type { Attendance, LeaveRequest } from "@/lib/types";
 import {
   IdCard,
   Phone,
@@ -21,13 +23,17 @@ export default async function DashboardPage() {
   const supabase = createClient();
 
   const today = new Date(Date.now() + 5 * 3600 * 1000).toISOString().slice(0, 10);
+  const historyStart = new Date(Date.parse(`${today}T00:00:00Z`) - 13 * 86_400_000).toISOString().slice(0, 10);
 
-  const { data: rows } = await supabase
-    .from("attendance")
-    .select("*")
-    .eq("user_id", profile.id)
-    .order("work_date", { ascending: false })
-    .limit(14);
+  const [{ data: rows }, { data: leaveData }] = await Promise.all([
+    supabase
+      .from("attendance")
+      .select("*")
+      .eq("user_id", profile.id)
+      .gte("work_date", historyStart)
+      .order("work_date", { ascending: false }),
+    supabase.from("leave_requests").select("*").eq("user_id", profile.id).eq("status", "APPROVED"),
+  ]);
 
   const history = (rows ?? []) as Attendance[];
   // Prefer a still-open shift (checked in, not yet checked out) over a
@@ -38,6 +44,14 @@ export default async function DashboardPage() {
   const todayRecord = history.find((r) => r.check_in && !r.check_out) ?? history.find((r) => r.work_date === today) ?? null;
 
   const presentDays = history.filter((r) => r.status !== "ABSENT").length;
+  const approvedLeaveDates = leaveDatesSet((leaveData ?? []) as LeaveRequest[]);
+  const attendanceHistory = buildAttendanceHistory(
+    history,
+    approvedLeaveDates,
+    profile.off_days,
+    historyStart,
+    today
+  );
 
   return (
     <div className="space-y-8">
@@ -89,7 +103,7 @@ export default async function DashboardPage() {
           <div className="flex items-center gap-2 font-semibold text-navy">
             <CalendarDays className="h-4 w-4 text-slate-400" /> Recent attendance
           </div>
-          <span className="text-sm text-slate-400">{presentDays} present (last 14)</span>
+          <span className="text-sm text-slate-400">{presentDays} present (last 14 days)</span>
         </div>
         {history.length === 0 ? (
           <p className="px-6 py-10 text-center text-sm text-slate-400">
@@ -107,17 +121,26 @@ export default async function DashboardPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
-              {history.map((r) => (
-                <tr key={r.id} className="text-slate-600">
-                  <td className="px-6 py-3 font-medium text-navy">{formatDate(r.work_date)}</td>
-                  <td className="px-6 py-3">{formatTime(r.check_in)}</td>
-                  <td className="px-6 py-3">{formatTime(r.check_out)}</td>
-                  <td className="px-6 py-3">{hoursBetween(r.check_in, r.check_out)}</td>
-                  <td className="px-6 py-3">
-                    <StatusBadge status={r.status} />
-                  </td>
-                </tr>
-              ))}
+              {attendanceHistory.map((entry) => {
+                const r = entry.record;
+                const status = entry.isOnLeave ? "ON_LEAVE" : r ? r.status : entry.isRestDay ? "REST_DAY" : "ABSENT";
+                return (
+                  <tr key={entry.date} className={`text-slate-600 ${entry.isOnLeave ? "bg-blue-50" : ""}`}>
+                    <td className="px-6 py-3 font-medium text-navy">
+                      {formatDate(entry.date)}
+                      {entry.isRestDay && !entry.isOnLeave && (
+                        <span className="ml-2 text-xs font-normal text-violet-500">Weekend</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-3">{formatTime(r?.check_in ?? null)}</td>
+                    <td className="px-6 py-3">{formatTime(r?.check_out ?? null)}</td>
+                    <td className="px-6 py-3">{hoursBetween(r?.check_in ?? null, r?.check_out ?? null)}</td>
+                    <td className="px-6 py-3">
+                      <StatusBadge status={status} />
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}

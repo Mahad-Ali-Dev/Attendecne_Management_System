@@ -5,6 +5,7 @@ import { StatCard } from "@/components/StatCard";
 import { MonthlyHoursChart } from "@/components/MonthlyHoursChart";
 import { STATUS_COLOR, STATUS_LABEL, buildMonthDayHours } from "@/lib/hours";
 import {
+  formatDate,
   formatHours,
   formatMonthLabel,
   formatOffDays,
@@ -59,7 +60,7 @@ export default async function MonthlyHoursPage({
     profile.off_days
   );
 
-  const workingDaysTotal = days.length;
+  const workingDaysTotal = days.filter((d) => !d.isRestDay).length;
   const leaveDaysTotal = days.filter((d) => d.status === "ON_LEAVE").length;
   const expectedHours = (workingDaysTotal - leaveDaysTotal) * shiftHours;
   const completedHours = days.reduce((sum, d) => sum + d.hours, 0);
@@ -149,7 +150,7 @@ export default async function MonthlyHoursPage({
           <table className="w-full text-sm">
             <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-400">
               <tr>
-                <th className="px-6 py-3 font-medium">Day</th>
+                <th className="px-6 py-3 font-medium">Date</th>
                 <th className="px-6 py-3 font-medium">Hours</th>
                 <th className="px-6 py-3 font-medium">Status</th>
               </tr>
@@ -157,9 +158,9 @@ export default async function MonthlyHoursPage({
             <tbody className="divide-y divide-slate-50">
               {days.map((d) => (
                 <tr key={d.date} className="text-slate-600">
-                  <td className="px-6 py-3 font-medium text-navy">{d.label}</td>
+                  <td className="px-6 py-3 font-medium text-navy">{formatDate(d.date)}</td>
                   <td className="px-6 py-3">
-                    {d.status === "UPCOMING" || d.status === "ON_LEAVE"
+                    {d.status === "UPCOMING" || d.status === "ON_LEAVE" || d.status === "REST_DAY"
                       ? "—"
                       : d.inProgress
                         ? "In progress"

@@ -23,3 +23,13 @@ export function categoryBadgeClass(category: SiteCategoryValue): string {
       return "bg-slate-100 text-slate-500";
   }
 }
+
+/** Formats a raw executable basename (e.g. "chrome.exe", "EXCEL.EXE") as e.g. "Chrome", "Excel". */
+export function formatAppName(appName: string): string {
+  const base = appName.replace(/\.exe$/i, "");
+  return base
+    .split(/[\s_-]+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
+}

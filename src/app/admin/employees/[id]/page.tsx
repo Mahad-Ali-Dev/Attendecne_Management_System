@@ -11,7 +11,7 @@ import { AttendanceEditor } from "./AttendanceEditor";
 import { SalarySlipEditor } from "./SalarySlipEditor";
 import { EmployeeLeaveHistory } from "./EmployeeLeaveHistory";
 import { EmployeeProductivity } from "./EmployeeProductivity";
-import { buildMonthDayHours } from "@/lib/hours";
+import { buildAttendanceHistory, buildMonthDayHours } from "@/lib/hours";
 import { leaveDatesSet } from "@/lib/payroll";
 import {
   formatDate,
@@ -65,10 +65,12 @@ export default async function EmployeeDetail({
   const daysInHoursMonth = new Date(Date.UTC(hoursYear, hoursMonth, 0)).getUTCDate();
   const hoursMonthStart = `${monthKey}-01`;
   const hoursMonthEnd = `${monthKey}-${String(daysInHoursMonth).padStart(2, "0")}`;
+  // Don't walk the attendance history into days that haven't happened yet
+  // when the selected month is still in progress.
+  const historyEnd = hoursMonthEnd > todayKey ? todayKey : hoursMonthEnd;
 
   const [
     { data: profileData },
-    { data: attData },
     { data: slipData },
     { data: salaryAttData },
     { data: leaveData },
@@ -77,12 +79,6 @@ export default async function EmployeeDetail({
     { data: sitesData },
   ] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", params.id).single(),
-    supabase
-      .from("attendance")
-      .select("*")
-      .eq("user_id", params.id)
-      .order("work_date", { ascending: false })
-      .limit(30),
     supabase
       .from("salary_slips")
       .select("*")
@@ -100,8 +96,8 @@ export default async function EmployeeDetail({
       .select("*")
       .eq("user_id", params.id)
       .order("start_date", { ascending: false }),
-    // Exact calendar-month slice for the hours chart below — distinct from
-    // both the 30-row-limited `history` and the 400-day salary window.
+    // Exact calendar-month slice for the hours chart and the attendance
+    // history list below, both scoped to the month selected above.
     supabase
       .from("attendance")
       .select("*")
@@ -128,7 +124,6 @@ export default async function EmployeeDetail({
   // Defensive default: guards against off_days being undefined right after
   // a deploy but before schema.sql has been re-run to add the column.
   const emp = { ...profileData, off_days: profileData.off_days ?? [0, 6] } as Profile;
-  const history = (attData ?? []) as Attendance[];
   const slips = (slipData ?? []) as SalarySlip[];
   const attendanceForSalary = (salaryAttData ?? []) as Attendance[];
   const leaveRequests = (leaveData ?? []) as LeaveRequest[];
@@ -146,8 +141,15 @@ export default async function EmployeeDetail({
     approvedLeaveDates,
     emp.off_days
   );
+  const attendanceHistory = buildAttendanceHistory(
+    hoursAttendance,
+    approvedLeaveDates,
+    emp.off_days,
+    hoursMonthStart,
+    historyEnd
+  );
 
-  const workingDaysTotal = hoursDays.length;
+  const workingDaysTotal = hoursDays.filter((d) => !d.isRestDay).length;
   const leaveDaysTotal = hoursDays.filter((d) => d.status === "ON_LEAVE").length;
   const expectedHours = (workingDaysTotal - leaveDaysTotal) * shiftHours;
   const completedHours = hoursDays.reduce((sum, d) => sum + d.hours, 0);
@@ -271,7 +273,7 @@ export default async function EmployeeDetail({
           </p>
         </div>
 
-        <AttendanceEditor employeeId={emp.id} history={history} />
+        <AttendanceEditor employeeId={emp.id} entries={attendanceHistory} monthLabel={monthLabel} />
         <SalarySlipEditor
           employeeId={emp.id}
           slips={slips}
