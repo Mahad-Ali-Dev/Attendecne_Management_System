@@ -183,3 +183,59 @@ export async function deleteAttendance(employeeId: string, workDate: string) {
   revalidatePath("/admin/salary");
   return { ok: true };
 }
+
+/**
+ * Admin correction for a day's tracked productive/unproductive time — the
+ * tracker writes these normally, but admins can fix an obviously wrong
+ * value (e.g. a stuck timer inflating one day's hours) the same way they
+ * can correct attendance. Only the two duration fields are editable here;
+ * tab_switch_count and the flagged/reason fields are tracker-computed
+ * signals, not "time," and stay out of admin's hands.
+ */
+export async function updateProductivitySession(
+  employeeId: string,
+  workDate: string,
+  productiveSeconds: number,
+  unproductiveSeconds: number
+) {
+  await requireAdmin();
+  const supabase = createClient();
+
+  if (!workDate) return { error: "Missing date." };
+  if (
+    !Number.isFinite(productiveSeconds) ||
+    !Number.isFinite(unproductiveSeconds) ||
+    productiveSeconds < 0 ||
+    unproductiveSeconds < 0
+  ) {
+    return { error: "Time can't be negative." };
+  }
+
+  const { error } = await supabase
+    .from("productivity_sessions")
+    .update({ total_productive_seconds: productiveSeconds, total_unproductive_seconds: unproductiveSeconds })
+    .eq("user_id", employeeId)
+    .eq("work_date", workDate);
+
+  if (error) return { error: error.message };
+  revalidatePath(`/admin/employees/${employeeId}`);
+  revalidatePath("/admin/productivity");
+  return { ok: true };
+}
+
+/** Admin removes a day's tracked productivity session entirely — e.g. a session that shouldn't have been recorded at all. */
+export async function deleteProductivitySession(employeeId: string, workDate: string) {
+  await requireAdmin();
+  const supabase = createClient();
+
+  const { error } = await supabase
+    .from("productivity_sessions")
+    .delete()
+    .eq("user_id", employeeId)
+    .eq("work_date", workDate);
+
+  if (error) return { error: error.message };
+  revalidatePath(`/admin/employees/${employeeId}`);
+  revalidatePath("/admin/productivity");
+  return { ok: true };
+}

@@ -271,6 +271,7 @@ export default async function EmployeeDetail({
         </div>
 
         <EmployeeProductivity
+          employeeId={emp.id}
           sessions={productivitySessions}
           sites={productivitySites}
           monthStart={hoursMonthStart}
