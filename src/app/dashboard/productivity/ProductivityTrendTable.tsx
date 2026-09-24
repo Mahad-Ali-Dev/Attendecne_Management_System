@@ -18,7 +18,6 @@ export function ProductivityTrendTable({ sessions }: { sessions: ProductivitySes
             <th className="px-6 py-3 font-medium">Productive</th>
             <th className="px-6 py-3 font-medium">Unproductive</th>
             <th className="px-6 py-3 font-medium">Productivity</th>
-            <th className="px-6 py-3 font-medium">Tab switches</th>
             <th className="px-6 py-3 font-medium">Status</th>
           </tr>
         </thead>
@@ -34,7 +33,6 @@ export function ProductivityTrendTable({ sessions }: { sessions: ProductivitySes
                 <td className="px-6 py-3 text-emerald-600">{formatHours(s.total_productive_seconds / 3600)}</td>
                 <td className="px-6 py-3 text-amber-600">{formatHours(s.total_unproductive_seconds / 3600)}</td>
                 <td className="px-6 py-3 font-medium text-navy">{pct === null ? "—" : `${pct}%`}</td>
-                <td className="px-6 py-3">{s.tab_switch_count}</td>
                 <td className="px-6 py-3">
                   {s.flagged_suspicious ? (
                     <span className="badge bg-red-50 text-red-700">
