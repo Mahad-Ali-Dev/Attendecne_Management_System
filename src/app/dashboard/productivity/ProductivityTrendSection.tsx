@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ProductivityChart, type ChartRow } from "./ProductivityChart";
+import { ProductivityChart, type ChartRow } from "@/components/ProductivityChart";
 import { ProductivityTrendTable } from "./ProductivityTrendTable";
 import { productivityPercent } from "@/lib/productivity";
 import { formatHours } from "@/lib/format";

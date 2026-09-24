@@ -13,6 +13,7 @@ import { EmployeeLeaveHistory } from "./EmployeeLeaveHistory";
 import { EmployeeProductivity } from "./EmployeeProductivity";
 import { buildAttendanceHistory, buildMonthDayHours } from "@/lib/hours";
 import { leaveDatesSet } from "@/lib/payroll";
+import { productivityPercent } from "@/lib/productivity";
 import {
   formatDate,
   formatHours,
@@ -38,6 +39,8 @@ import {
   CalendarOff,
   Target,
   TrendingUp,
+  TrendingDown,
+  Percent,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
@@ -155,6 +158,10 @@ export default async function EmployeeDetail({
   const completedHours = hoursDays.reduce((sum, d) => sum + d.hours, 0);
   const completionPct = expectedHours > 0 ? Math.round((completedHours / expectedHours) * 100) : 0;
 
+  const monthProductiveSeconds = productivitySessions.reduce((sum, s) => sum + s.total_productive_seconds, 0);
+  const monthUnproductiveSeconds = productivitySessions.reduce((sum, s) => sum + s.total_unproductive_seconds, 0);
+  const monthProductivityPct = productivityPercent(monthProductiveSeconds, monthUnproductiveSeconds);
+
   const monthLabel = formatMonthLabel(monthKey);
   const prevMonthKey = shiftMonthKey(monthKey, -1);
   const nextMonthKey = shiftMonthKey(monthKey, 1);
@@ -236,7 +243,40 @@ export default async function EmployeeDetail({
         </div>
       </div>
 
-      <EmployeeProductivity sessions={productivitySessions} sites={productivitySites} />
+      <div className="space-y-4">
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <StatCard
+            icon={<Clock className="h-5 w-5" />}
+            label="Total tracked this month"
+            value={formatHours((monthProductiveSeconds + monthUnproductiveSeconds) / 3600)}
+          />
+          <StatCard
+            icon={<TrendingUp className="h-5 w-5" />}
+            label="Productive this month"
+            value={formatHours(monthProductiveSeconds / 3600)}
+            accent="text-emerald-600"
+          />
+          <StatCard
+            icon={<TrendingDown className="h-5 w-5" />}
+            label="Unproductive this month"
+            value={formatHours(monthUnproductiveSeconds / 3600)}
+            accent="text-amber-600"
+          />
+          <StatCard
+            icon={<Percent className="h-5 w-5" />}
+            label="Productivity this month"
+            value={monthProductivityPct === null ? "—" : `${monthProductivityPct}%`}
+            accent="text-brand-600"
+          />
+        </div>
+
+        <EmployeeProductivity
+          sessions={productivitySessions}
+          sites={productivitySites}
+          monthStart={hoursMonthStart}
+          monthEnd={historyEnd}
+        />
+      </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Profile */}
