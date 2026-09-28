@@ -132,9 +132,11 @@ export default async function DashboardPage() {
                         <span className="ml-2 text-xs font-normal text-violet-500">Weekend</span>
                       )}
                     </td>
-                    <td className="px-6 py-3">{formatTime(r?.check_in ?? null)}</td>
-                    <td className="px-6 py-3">{formatTime(r?.check_out ?? null)}</td>
-                    <td className="px-6 py-3">{hoursBetween(r?.check_in ?? null, r?.check_out ?? null)}</td>
+                    <td className="px-6 py-3">{entry.isOnLeave ? "—" : formatTime(r?.check_in ?? null)}</td>
+                    <td className="px-6 py-3">{entry.isOnLeave ? "—" : formatTime(r?.check_out ?? null)}</td>
+                    <td className="px-6 py-3">
+                      {entry.isOnLeave ? "—" : hoursBetween(r?.check_in ?? null, r?.check_out ?? null)}
+                    </td>
                     <td className="px-6 py-3">
                       <StatusBadge status={status} />
                     </td>

@@ -63,15 +63,20 @@ export function buildMonthDayHours(
     const dateStr = `${monthKey}-${String(d).padStart(2, "0")}`;
     const isRestDay = !isWorkingDay(dateObj, offDays);
 
+    const isOnLeave = leaveDates.has(dateStr);
     const rec = byDate.get(dateStr);
-    const hasCheckedIn = !!rec?.check_in;
-    const hasCheckedOut = !!rec?.check_out;
+    const hasCheckedIn = !isOnLeave && !!rec?.check_in;
+    const hasCheckedOut = !isOnLeave && !!rec?.check_out;
     const inProgress = hasCheckedIn && !hasCheckedOut;
+    // A leave day is excused entirely — any attendance record on it (e.g. a
+    // punch recorded before the leave was approved) shouldn't still count
+    // toward completed hours, or it'd inflate completion despite the day
+    // already being excluded from expected hours below.
     const hours = hasCheckedOut ? hoursDecimal(rec!.check_in, rec!.check_out) : 0;
 
     let status: DayStatus;
     if (dateStr > todayKey) status = "UPCOMING";
-    else if (leaveDates.has(dateStr)) status = "ON_LEAVE"; // excused — takes priority over absent/partial
+    else if (isOnLeave) status = "ON_LEAVE"; // excused — takes priority over absent/partial
     else if (isRestDay && !hasCheckedIn) status = "REST_DAY"; // not expected in — distinct from "ABSENT"
     else if (!hasCheckedIn) status = "ABSENT";
     else if (inProgress) status = "PARTIAL"; // checked in, not out yet — not final, not "absent"
