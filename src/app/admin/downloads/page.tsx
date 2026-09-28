@@ -1,5 +1,4 @@
 import { requireAdmin } from "@/lib/data";
-import { createAdminClient } from "@/lib/supabase/server";
 import { listDesktopBuilds } from "@/lib/desktopBuilds";
 import { DownloadsManager } from "./DownloadsManager";
 
@@ -7,10 +6,7 @@ export const dynamic = "force-dynamic";
 
 export default async function AdminDownloadsPage() {
   await requireAdmin();
-  // Storage's list() needs its own RLS policy on storage.objects, which
-  // this project's bucket doesn't have — the admin client bypasses that,
-  // same as the avatar upload already does.
-  const builds = await listDesktopBuilds(createAdminClient());
+  const builds = await listDesktopBuilds();
 
   return (
     <div className="space-y-6">

@@ -4,8 +4,7 @@ import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { deleteDesktopBuild, uploadDesktopBuild } from "./actions";
 import { Modal } from "@/components/Modal";
-import { formatFileSize } from "@/lib/desktopBuilds";
-import { formatDate } from "@/lib/format";
+import { formatDate, formatFileSize } from "@/lib/format";
 import type { DesktopBuild } from "@/lib/types";
 import { Download, Loader2, Trash2, Upload } from "lucide-react";
 

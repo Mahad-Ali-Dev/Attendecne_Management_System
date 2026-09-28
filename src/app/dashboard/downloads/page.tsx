@@ -1,17 +1,13 @@
 import { getCurrentProfile } from "@/lib/data";
-import { createAdminClient } from "@/lib/supabase/server";
-import { listDesktopBuilds, formatFileSize } from "@/lib/desktopBuilds";
-import { formatDate } from "@/lib/format";
+import { listDesktopBuilds } from "@/lib/desktopBuilds";
+import { formatDate, formatFileSize } from "@/lib/format";
 import { Download, Monitor } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
 export default async function DownloadsPage() {
   await getCurrentProfile();
-  // Storage's list() needs its own RLS policy on storage.objects, which
-  // this project's bucket doesn't have — the admin client bypasses that,
-  // same as the avatar upload already does.
-  const builds = await listDesktopBuilds(createAdminClient());
+  const builds = await listDesktopBuilds();
   const latest = builds[0] ?? null;
 
   return (

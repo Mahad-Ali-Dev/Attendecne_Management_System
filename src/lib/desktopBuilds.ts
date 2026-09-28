@@ -1,56 +1,118 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
+import "server-only";
+import {
+  S3Client,
+  ListObjectsV2Command,
+  DeleteObjectCommand,
+  GetObjectCommand,
+} from "@aws-sdk/client-s3";
+import { Upload } from "@aws-sdk/lib-storage";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import type { DesktopBuild } from "@/lib/types";
 
-export const DESKTOP_BUILDS_BUCKET = "desktop-builds";
-
-// Storage object keys can't contain "/" grouping without creating a real
-// subfolder (which would need a second list() call per upload to reach the
-// file inside it), so every build is stored flat at the bucket root as
-// "<uploaded-at ms>-<random>__<original filename>" — sortable by name and
-// splittable back into the original filename for the download prompt.
+// Backblaze B2 (S3-compatible), not Cloudinary: Cloudinary's free plan hard-caps
+// "raw" files at 10MB account-wide (confirmed via its own usage API — a
+// resource_type:"video" workaround was rejected outright: "Unsupported video
+// format or file"). B2's free tier (10GB) needs no credit card and has no
+// per-file cap, so it comfortably handles a 110MB installer.
+const FOLDER = "tracker-builds";
 const NAME_SEPARATOR = "__";
+const DOWNLOAD_URL_TTL_SECONDS = 3600;
 
-export function buildStorageKey(originalFilename: string): string {
-  const unique = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  return `${unique}${NAME_SEPARATOR}${originalFilename}`;
+// B2's S3-compatible endpoint hostname embeds its region, e.g.
+// "s3.us-west-004.backblazeb2.com" — read off the bucket's details page.
+function regionFromEndpoint(endpoint: string): string {
+  const match = endpoint.match(/s3\.([\w-]+)\.backblazeb2\.com/);
+  if (!match) throw new Error(`B2_ENDPOINT doesn't look like a B2 S3 endpoint: ${endpoint}`);
+  return match[1];
 }
 
-function originalFilename(storedName: string): string {
-  const idx = storedName.indexOf(NAME_SEPARATOR);
-  return idx >= 0 ? storedName.slice(idx + NAME_SEPARATOR.length) : storedName;
+let client: S3Client | null = null;
+function getClient(): S3Client {
+  if (client) return client;
+  const endpoint = process.env.B2_ENDPOINT!;
+  client = new S3Client({
+    region: regionFromEndpoint(endpoint),
+    endpoint: endpoint.startsWith("http") ? endpoint : `https://${endpoint}`,
+    credentials: {
+      accessKeyId: process.env.B2_ACCESS_KEY_ID!,
+      secretAccessKey: process.env.B2_SECRET_ACCESS_KEY!,
+    },
+  });
+  return client;
+}
+
+function bucket(): string {
+  return process.env.B2_BUCKET_NAME!;
+}
+
+// B2 object keys can safely hold most characters, but keep this tight and
+// predictable since the true original filename is decoded back out of it
+// (see fallbackFilename) rather than stored separately.
+function sanitize(filename: string): string {
+  return filename.replace(/[^\w.\- ]/g, "_");
+}
+
+function filenameFromKey(key: string): string {
+  const base = key.startsWith(`${FOLDER}/`) ? key.slice(FOLDER.length + 1) : key;
+  const idx = base.indexOf(NAME_SEPARATOR);
+  return idx >= 0 ? base.slice(idx + NAME_SEPARATOR.length) : base;
 }
 
 /** Lists every uploaded desktop-app build, newest first. */
-export async function listDesktopBuilds(supabase: SupabaseClient): Promise<DesktopBuild[]> {
-  const { data, error } = await supabase.storage.from(DESKTOP_BUILDS_BUCKET).list("", {
-    limit: 100,
-    sortBy: { column: "created_at", order: "desc" },
-  });
-  if (error || !data) return [];
+export async function listDesktopBuilds(): Promise<DesktopBuild[]> {
+  const s3 = getClient();
+  const result = await s3.send(
+    new ListObjectsV2Command({ Bucket: bucket(), Prefix: `${FOLDER}/` })
+  );
 
-  return data
-    .filter((f) => f.id)
-    .map((f) => {
-      const { data: pub } = supabase.storage.from(DESKTOP_BUILDS_BUCKET).getPublicUrl(f.name);
+  const objects = (result.Contents ?? []).filter((o) => o.Key && o.Size);
+  const builds = await Promise.all(
+    objects.map(async (o) => {
+      const key = o.Key!;
+      const url = await getSignedUrl(s3, new GetObjectCommand({ Bucket: bucket(), Key: key }), {
+        expiresIn: DOWNLOAD_URL_TTL_SECONDS,
+      });
       return {
-        path: f.name,
-        filename: originalFilename(f.name),
-        size: f.metadata?.size ?? 0,
-        uploadedAt: f.created_at ?? new Date().toISOString(),
-        url: pub.publicUrl,
+        path: key,
+        filename: filenameFromKey(key),
+        size: o.Size!,
+        uploadedAt: (o.LastModified ?? new Date()).toISOString(),
+        url,
       };
-    });
+    })
+  );
+
+  return builds.sort((a, b) => (a.uploadedAt < b.uploadedAt ? 1 : -1));
 }
 
-/** Formats a byte count as e.g. "24.3 MB". */
-export function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  const units = ["KB", "MB", "GB"];
-  let value = bytes / 1024;
-  let unitIndex = 0;
-  while (value >= 1024 && unitIndex < units.length - 1) {
-    value /= 1024;
-    unitIndex++;
+/** Uploads a new build to B2. Large files are uploaded as multipart automatically. */
+export async function uploadDesktopBuildFile(file: File): Promise<{ error?: string }> {
+  const unique = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const key = `${FOLDER}/${unique}${NAME_SEPARATOR}${sanitize(file.name)}`;
+
+  try {
+    const upload = new Upload({
+      client: getClient(),
+      params: {
+        Bucket: bucket(),
+        Key: key,
+        Body: Buffer.from(await file.arrayBuffer()),
+        ContentType: file.type || "application/octet-stream",
+      },
+    });
+    await upload.done();
+    return {};
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Upload failed." };
   }
-  return `${value.toFixed(1)} ${units[unitIndex]}`;
+}
+
+/** Removes a previously uploaded build from B2. */
+export async function deleteDesktopBuild(key: string): Promise<{ error?: string }> {
+  try {
+    await getClient().send(new DeleteObjectCommand({ Bucket: bucket(), Key: key }));
+    return {};
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Delete failed." };
+  }
 }
