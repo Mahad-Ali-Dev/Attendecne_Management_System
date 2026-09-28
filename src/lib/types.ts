@@ -151,3 +151,16 @@ export interface SiteCategory {
   created_by: string | null;
   created_at: string;
 }
+
+/**
+ * A desktop-agent installer build the admin uploaded for employees to
+ * download — lives in Supabase Storage, not a database table; this is just
+ * the shape listDesktopBuilds() maps storage objects into.
+ */
+export interface DesktopBuild {
+  path: string;
+  filename: string;
+  size: number;
+  uploadedAt: string;
+  url: string;
+}
