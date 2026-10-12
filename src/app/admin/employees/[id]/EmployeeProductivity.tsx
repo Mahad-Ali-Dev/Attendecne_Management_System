@@ -2,17 +2,18 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { deleteProductivitySession, updateProductivitySession } from "../actions";
+import { addProductivitySession, deleteProductivitySession, updateProductivitySession } from "../actions";
 import { ProductivityChart, type ChartRow } from "@/components/ProductivityChart";
 import { Modal } from "@/components/Modal";
 import { AppBreakdownModal } from "@/components/AppBreakdownModal";
 import { StatCard } from "@/components/StatCard";
 import { productivityPercent } from "@/lib/productivity";
-import { formatDate, formatHours } from "@/lib/format";
+import { formatDate, formatHours, pktNow } from "@/lib/format";
 import type { AppActivity, ProductivitySession } from "@/lib/types";
-import { AlertTriangle, Loader2, Pencil, Percent, Target, Trash2, TrendingUp } from "lucide-react";
+import { AlertTriangle, Loader2, Pencil, Percent, Plus, Target, Trash2, TrendingUp } from "lucide-react";
 
 interface EditState {
+  mode: "add" | "edit";
   workDate: string;
   productiveH: number;
   productiveM: number;
@@ -71,8 +72,29 @@ export function EmployeeProductivity({
     return rows;
   }, [sessions, monthStart, monthEnd]);
 
+  // Normally the day to add is yesterday (an employee reports forgetting the
+  // tracker the next day), so start there — or from the last day of an older
+  // month being viewed — and skip days that already have a session.
+  function defaultAddDate(): string {
+    const todayKey = pktNow().toISOString().slice(0, 10);
+    const yesterday = new Date(Date.parse(`${todayKey}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
+    const start = monthEnd < yesterday ? monthEnd : yesterday;
+    const taken = new Set(sessions.map((s) => s.work_date));
+    for (let t = Date.parse(`${start}T00:00:00Z`); t >= Date.parse(`${monthStart}T00:00:00Z`); t -= 86_400_000) {
+      const date = new Date(t).toISOString().slice(0, 10);
+      if (!taken.has(date)) return date;
+    }
+    return start;
+  }
+
+  function openAdd() {
+    setModal({ mode: "add", workDate: defaultAddDate(), productiveH: 0, productiveM: 0, unproductiveH: 0, unproductiveM: 0 });
+    setError(null);
+  }
+
   function openEdit(s: ProductivitySession) {
     setModal({
+      mode: "edit",
       workDate: s.work_date,
       productiveH: Math.floor(s.total_productive_seconds / 3600),
       productiveM: Math.floor((s.total_productive_seconds % 3600) / 60),
@@ -94,11 +116,19 @@ export function EmployeeProductivity({
     const productiveSeconds = modal.productiveH * 3600 + modal.productiveM * 60;
     const unproductiveSeconds = modal.unproductiveH * 3600 + modal.unproductiveM * 60;
     startTransition(async () => {
-      const res = await updateProductivitySession(employeeId, modal.workDate, productiveSeconds, unproductiveSeconds);
+      const save = modal.mode === "add" ? addProductivitySession : updateProductivitySession;
+      const res = await save(employeeId, modal.workDate, productiveSeconds, unproductiveSeconds);
       if (res?.error) {
         setError(res.error);
       } else {
-        router.refresh();
+        // An added day can fall outside the month being viewed (e.g. adding
+        // yesterday on the 1st) — go to its month so the new row is visible.
+        const addedMonth = modal.workDate.slice(0, 7);
+        if (modal.mode === "add" && addedMonth !== monthStart.slice(0, 7)) {
+          router.push(`/admin/employees/${employeeId}?month=${addedMonth}`);
+        } else {
+          router.refresh();
+        }
         closeModal();
       }
     });
@@ -120,9 +150,17 @@ export function EmployeeProductivity({
 
   return (
     <div className="card overflow-hidden">
-      <div className="border-b border-slate-100 px-6 py-4">
-        <h2 className="font-semibold text-navy">Productivity</h2>
-        <p className="text-xs text-slate-400">App activity tracked for the month selected above.</p>
+      <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+        <div>
+          <h2 className="font-semibold text-navy">Productivity</h2>
+          <p className="text-xs text-slate-400">App activity tracked for the month selected above.</p>
+        </div>
+        <button
+          onClick={openAdd}
+          className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-brand-600 transition hover:bg-brand-50"
+        >
+          <Plus className="h-3.5 w-3.5" /> Add time
+        </button>
       </div>
 
       <div className="grid grid-cols-1 gap-4 border-b border-slate-100 p-6 sm:grid-cols-3">
@@ -228,8 +266,24 @@ export function EmployeeProductivity({
       )}
 
       {modal && (
-        <Modal title={`Edit productivity — ${formatDate(modal.workDate)}`} onClose={closeModal}>
+        <Modal
+          title={modal.mode === "add" ? "Add tracked time" : `Edit productivity — ${formatDate(modal.workDate)}`}
+          onClose={closeModal}
+        >
           <form onSubmit={onSubmit} className="space-y-4">
+            {modal.mode === "add" && (
+              <div>
+                <label className="label">Date</label>
+                <input
+                  type="date"
+                  required
+                  max={pktNow().toISOString().slice(0, 10)}
+                  value={modal.workDate}
+                  onChange={(e) => setModal({ ...modal, workDate: e.target.value })}
+                  className="input"
+                />
+              </div>
+            )}
             <div>
               <label className="label">Productive time</label>
               <div className="flex items-center gap-2">
@@ -279,8 +333,9 @@ export function EmployeeProductivity({
               </div>
             </div>
             <p className="text-xs text-slate-400">
-              This corrects the tracker&apos;s recorded totals for the day — it doesn&apos;t change the per-site
-              breakdown.
+              {modal.mode === "add"
+                ? "For a day the tracker wasn't running — e.g. the employee forgot to start it. Time added this way has no per-app breakdown."
+                : "This corrects the tracker's recorded totals for the day — it doesn't change the per-app breakdown."}
             </p>
             {error && <p className="text-xs text-red-600">{error}</p>}
             <div className="flex justify-end gap-2 pt-2">

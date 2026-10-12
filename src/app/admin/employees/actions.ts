@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { requireAdmin } from "@/lib/data";
-import { isLateCheckIn } from "@/lib/format";
+import { isLateCheckIn, pktNow } from "@/lib/format";
 
 /**
  * Links an employee to the numeric user ID their fingerprint was enrolled
@@ -218,6 +218,58 @@ export async function updateProductivitySession(
     .eq("work_date", workDate);
 
   if (error) return { error: error.message };
+  revalidatePath(`/admin/employees/${employeeId}`);
+  revalidatePath("/admin/productivity");
+  return { ok: true };
+}
+
+/**
+ * Admin adds a day's tracked time by hand — e.g. an employee forgot to start
+ * the tracker and told an admin the next day. Only the two totals exist for
+ * such a day (no per-app breakdown). Refuses a date that already has a
+ * session — that's what updateProductivitySession is for. Goes through the
+ * service-role client because the tracker owns writes to this table, so
+ * there's no admin insert policy to rely on.
+ */
+export async function addProductivitySession(
+  employeeId: string,
+  workDate: string,
+  productiveSeconds: number,
+  unproductiveSeconds: number
+) {
+  await requireAdmin();
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(workDate)) return { error: "Pick a date." };
+  if (workDate > pktNow().toISOString().slice(0, 10)) return { error: "Can't add time for a future date." };
+  if (!Number.isFinite(productiveSeconds) || !Number.isFinite(unproductiveSeconds)) {
+    return { error: "Enter the tracked time." };
+  }
+  if (productiveSeconds < 0 || unproductiveSeconds < 0) return { error: "Time can't be negative." };
+
+  const productive = Math.round(productiveSeconds);
+  const unproductive = Math.round(unproductiveSeconds);
+  if (productive + unproductive === 0) return { error: "Enter some tracked time." };
+  if (productive + unproductive > 24 * 3600) return { error: "A day can't have more than 24 hours tracked." };
+
+  const admin = createAdminClient();
+  const { data: existing } = await admin
+    .from("productivity_sessions")
+    .select("id")
+    .eq("user_id", employeeId)
+    .eq("work_date", workDate)
+    .maybeSingle();
+  if (existing) return { error: "That date already has tracked time — edit it instead." };
+
+  const { error } = await admin.from("productivity_sessions").insert({
+    user_id: employeeId,
+    work_date: workDate,
+    total_productive_seconds: productive,
+    total_unproductive_seconds: unproductive,
+  });
+
+  if (error) {
+    return { error: error.code === "23505" ? "That date already has tracked time — edit it instead." : error.message };
+  }
   revalidatePath(`/admin/employees/${employeeId}`);
   revalidatePath("/admin/productivity");
   return { ok: true };
