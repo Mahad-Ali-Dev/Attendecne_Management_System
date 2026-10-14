@@ -4,21 +4,13 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { reviewLeaveRequest } from "../actions";
 import { Avatar } from "@/components/Avatar";
+import { LeaveDetailModal } from "@/components/LeaveDetailModal";
+import { LEAVE_STATUS_STYLE, titleCase } from "@/lib/leave";
 import { formatDate } from "@/lib/format";
 import type { LeaveRequest, LeaveStatus, Profile } from "@/lib/types";
 import { Check, X, Loader2 } from "lucide-react";
 
-const STATUS_STYLE: Record<LeaveStatus, string> = {
-  PENDING: "bg-amber-50 text-amber-700",
-  APPROVED: "bg-emerald-50 text-emerald-700",
-  REJECTED: "bg-red-50 text-red-700",
-};
-
 const STATUS_RANK: Record<LeaveStatus, number> = { PENDING: 0, APPROVED: 1, REJECTED: 2 };
-
-function titleCase(s: string) {
-  return s.charAt(0) + s.slice(1).toLowerCase();
-}
 
 export function LeaveReviewTable({
   requests,
@@ -32,6 +24,7 @@ export function LeaveReviewTable({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [actingId, setActingId] = useState<string | null>(null);
+  const [viewing, setViewing] = useState<LeaveRequest | null>(null);
 
   const employeeById = useMemo(() => new Map(employees.map((e) => [e.id, e])), [employees]);
 
@@ -48,6 +41,7 @@ export function LeaveReviewTable({
     startTransition(async () => {
       await reviewLeaveRequest(id, approve);
       setActingId(null);
+      setViewing(null);
       router.refresh();
     });
   }
@@ -74,7 +68,11 @@ export function LeaveReviewTable({
             const emp = employeeById.get(r.user_id);
             const busy = pending && actingId === r.id;
             return (
-              <tr key={r.id} className="text-slate-600">
+              <tr
+                key={r.id}
+                onClick={() => setViewing(r)}
+                className="cursor-pointer text-slate-600 hover:bg-slate-50"
+              >
                 <td className="px-6 py-3">
                   <div className="flex items-center gap-3">
                     <Avatar name={emp?.full_name ?? "?"} src={emp?.avatar_url ?? null} size={32} />
@@ -88,7 +86,7 @@ export function LeaveReviewTable({
                 <td className="px-6 py-3">{titleCase(r.leave_type)}</td>
                 <td className="max-w-xs truncate px-6 py-3 text-slate-500">{r.reason || "—"}</td>
                 <td className="px-6 py-3">
-                  <span className={`badge ${STATUS_STYLE[r.status]}`}>
+                  <span className={`badge ${LEAVE_STATUS_STYLE[r.status]}`}>
                     <span className="h-1.5 w-1.5 rounded-full bg-current opacity-70" />
                     {titleCase(r.status)}
                   </span>
@@ -97,7 +95,10 @@ export function LeaveReviewTable({
                   {r.status === "PENDING" && (
                     <div className="flex justify-end gap-1">
                       <button
-                        onClick={() => act(r.id, true)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          act(r.id, true);
+                        }}
                         disabled={busy}
                         aria-label="Approve"
                         className="rounded-lg p-1.5 text-emerald-600 transition hover:bg-emerald-50 disabled:opacity-50"
@@ -105,7 +106,10 @@ export function LeaveReviewTable({
                         {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
                       </button>
                       <button
-                        onClick={() => act(r.id, false)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          act(r.id, false);
+                        }}
                         disabled={busy}
                         aria-label="Reject"
                         className="rounded-lg p-1.5 text-red-600 transition hover:bg-red-50 disabled:opacity-50"
@@ -120,6 +124,16 @@ export function LeaveReviewTable({
           })}
         </tbody>
       </table>
+
+      {viewing && (
+        <LeaveDetailModal
+          request={viewing}
+          employee={employeeById.get(viewing.user_id)}
+          onClose={() => setViewing(null)}
+          onReview={(approve) => act(viewing.id, approve)}
+          busy={pending && actingId === viewing.id}
+        />
+      )}
     </div>
   );
 }
