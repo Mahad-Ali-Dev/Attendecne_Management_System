@@ -20,7 +20,15 @@ function titleCase(s: string) {
   return s.charAt(0) + s.slice(1).toLowerCase();
 }
 
-export function LeaveReviewTable({ requests, employees }: { requests: LeaveRequest[]; employees: Profile[] }) {
+export function LeaveReviewTable({
+  requests,
+  employees,
+  emptyMessage = "No leave requests yet.",
+}: {
+  requests: LeaveRequest[];
+  employees: Profile[];
+  emptyMessage?: string;
+}) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [actingId, setActingId] = useState<string | null>(null);
@@ -45,7 +53,7 @@ export function LeaveReviewTable({ requests, employees }: { requests: LeaveReque
   }
 
   if (requests.length === 0) {
-    return <div className="card px-6 py-12 text-center text-sm text-slate-400">No leave requests yet.</div>;
+    return <div className="card px-6 py-12 text-center text-sm text-slate-400">{emptyMessage}</div>;
   }
 
   return (
