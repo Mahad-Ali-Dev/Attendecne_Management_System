@@ -8,6 +8,11 @@ export const metadata: Metadata = {
   title: "Evolut Attendance | Evolut Ecommerce Solutions",
   description:
     "Employee attendance management system for Evolut Ecommerce Solutions — Ecommerce, engineered for scale.",
+  icons: {
+    icon: "/logo.png",
+    shortcut: "/logo.png",
+    apple: "/logo.png",
+  },
 };
 
 export default function RootLayout({
