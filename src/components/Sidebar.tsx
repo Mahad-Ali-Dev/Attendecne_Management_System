@@ -19,6 +19,7 @@ import {
   LifeBuoy,
   Activity,
   Download,
+  FileBarChart,
   Menu,
   X,
 } from "lucide-react";
@@ -38,6 +39,7 @@ function navItems(isAdmin: boolean) {
       { href: "/admin/employees", label: "Employees", icon: Users },
       { href: "/admin/productivity", label: "Productivity", icon: Activity },
       { href: "/admin/salary", label: "Salary", icon: Wallet },
+      { href: "/admin/reports", label: "Reports", icon: FileBarChart },
       { href: "/admin/leave", label: "Leave", icon: CalendarOff },
       { href: "/admin/support", label: "Support", icon: LifeBuoy },
       { href: "/admin/downloads", label: "Tracker", icon: Download },
