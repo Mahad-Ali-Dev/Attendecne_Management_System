@@ -3,7 +3,7 @@ import { requireAdmin } from "@/lib/data";
 import { createClient } from "@/lib/supabase/server";
 import { StatCard } from "@/components/StatCard";
 import { PayrollTable } from "./PayrollTable";
-import { formatCurrency, formatMonthLabel, monthKeyOf, pktNow, shiftMonthKey } from "@/lib/format";
+import { formatCurrency, formatMonthLabel, isActiveInMonth, monthKeyOf, pktNow, shiftMonthKey } from "@/lib/format";
 import type { Attendance, LeaveRequest, Profile, SalarySlip } from "@/lib/types";
 import { Users, CheckCircle2, Clock3, Wallet, ChevronLeft, ChevronRight } from "lucide-react";
 
@@ -32,7 +32,11 @@ export default async function AdminSalaryPage({
     supabase.from("leave_requests").select("*").eq("status", "APPROVED"),
   ]);
 
-  const employees = (profilesData ?? []) as Profile[];
+  // Someone disabled before this month began is no longer on payroll for it;
+  // the month they left (and every earlier one) still lists them.
+  const employees = ((profilesData ?? []) as Profile[]).filter((e) =>
+    isActiveInMonth(e.disabled_at, monthKey)
+  );
   const slips = (slipsData ?? []) as SalarySlip[];
   const attendance = (attData ?? []) as Attendance[];
   const leaveRequests = (leaveData ?? []) as LeaveRequest[];

@@ -5,7 +5,7 @@ import { DateNav } from "@/components/DateNav";
 import { ProductivityOverviewTable } from "./ProductivityOverviewTable";
 import { NeedsCategorization } from "./NeedsCategorization";
 import { FlaggedSessionsPanel } from "./FlaggedSessionsPanel";
-import { pktNow } from "@/lib/format";
+import { isActiveInMonth, pktNow } from "@/lib/format";
 import type { AppActivity, Profile, ProductivitySession, SiteCategory } from "@/lib/types";
 import { Users, TrendingUp, AlertTriangle } from "lucide-react";
 
@@ -57,7 +57,10 @@ export default async function AdminProductivityPage({ searchParams }: { searchPa
       .order("work_date", { ascending: false }),
   ]);
 
-  const employees = (profilesData ?? []) as Profile[];
+  // Drop anyone disabled in an earlier month than the day being viewed.
+  const employees = ((profilesData ?? []) as Profile[]).filter((e) =>
+    isActiveInMonth(e.disabled_at, dateKey.slice(0, 7))
+  );
   const sessions = (sessionsData ?? []) as ProductivitySession[];
   const apps = (appsData ?? []) as AppActivity[];
   const categorized = new Set(((categoriesData ?? []) as SiteCategory[]).map((c) => c.hostname));

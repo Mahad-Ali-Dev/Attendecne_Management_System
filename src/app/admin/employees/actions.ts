@@ -32,6 +32,61 @@ export async function setDeviceUserId(employeeId: string, deviceUserId: string) 
   return { ok: true };
 }
 
+/**
+ * Disables (employee left the company) or re-enables a profile. Disabling
+ * keeps every record — it just stamps profiles.disabled_at with today's PKT
+ * date and bans the auth user so they can't sign in, and from the month after
+ * their disable month onward they drop out of attendance and all stats.
+ * Re-enabling clears the stamp and lifts the ban. Nothing is ever deleted.
+ *
+ * Goes through the service-role client: lifting/applying the auth ban needs
+ * admin API access anyway, so both writes stay on the one privileged client.
+ * An admin can't disable themselves or another admin.
+ */
+export async function setEmployeeDisabled(employeeId: string, disabled: boolean) {
+  const me = await requireAdmin();
+  if (employeeId === me.id) return { error: "You can't disable your own account." };
+
+  const admin = createAdminClient();
+  const { data: target, error: lookupErr } = await admin
+    .from("profiles")
+    .select("role, disabled_at")
+    .eq("id", employeeId)
+    .single();
+  if (lookupErr || !target) return { error: "Employee not found." };
+  if (target.role === "ADMIN") return { error: "Admins can't be disabled." };
+
+  const disabledAt = disabled ? pktNow().toISOString().slice(0, 10) : null;
+
+  const { error: updateErr } = await admin
+    .from("profiles")
+    .update({ disabled_at: disabledAt })
+    .eq("id", employeeId);
+  if (updateErr) return { error: updateErr.message };
+
+  // Ban (or un-ban) at the auth level too, so a disabled employee truly can't
+  // authenticate — not even with a token they already hold, once it expires,
+  // since the ban also blocks refresh. "none" lifts an existing ban.
+  const { error: banErr } = await admin.auth.admin.updateUserById(employeeId, {
+    ban_duration: disabled ? "876000h" : "none",
+  });
+  if (banErr) {
+    // Keep the two in step: if the ban couldn't be changed, roll the flag back
+    // so we never show "active" for a banned user (or vice versa).
+    await admin.from("profiles").update({ disabled_at: target.disabled_at }).eq("id", employeeId);
+    return { error: banErr.message };
+  }
+
+  // Every surface that lists or counts employees needs to reflect the change.
+  revalidatePath(`/admin/employees/${employeeId}`);
+  revalidatePath("/admin/employees");
+  revalidatePath("/admin");
+  revalidatePath("/admin/salary");
+  revalidatePath("/admin/reports");
+  revalidatePath("/admin/productivity");
+  return { ok: true };
+}
+
 function timeToMinutes(time: string): number {
   const [h, m] = time.split(":").map(Number);
   return h * 60 + m;

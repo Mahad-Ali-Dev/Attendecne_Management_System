@@ -7,6 +7,7 @@ import { MonthlyHoursChart } from "@/components/MonthlyHoursChart";
 import { DeviceMappingForm } from "./DeviceMappingForm";
 import { ShiftEditForm } from "./ShiftEditForm";
 import { OffDaysEditForm } from "./OffDaysEditForm";
+import { DisableEmployeeControl } from "./DisableEmployeeControl";
 import { AttendanceEditor } from "./AttendanceEditor";
 import { SalarySlipEditor } from "./SalarySlipEditor";
 import { EmployeeLeaveHistory } from "./EmployeeLeaveHistory";
@@ -124,9 +125,13 @@ export default async function EmployeeDetail({
   ]);
 
   if (!profileData) notFound();
-  // Defensive default: guards against off_days being undefined right after
-  // a deploy but before schema.sql has been re-run to add the column.
-  const emp = { ...profileData, off_days: profileData.off_days ?? [0, 6] } as Profile;
+  // Defensive default: guards against off_days / disabled_at being undefined
+  // right after a deploy but before schema.sql has been re-run to add them.
+  const emp = {
+    ...profileData,
+    off_days: profileData.off_days ?? [0, 6],
+    disabled_at: profileData.disabled_at ?? null,
+  } as Profile;
   const slips = (slipData ?? []) as SalarySlip[];
   const attendanceForSalary = (salaryAttData ?? []) as Attendance[];
   const leaveRequests = (leaveData ?? []) as LeaveRequest[];
@@ -177,6 +182,18 @@ export default async function EmployeeDetail({
       >
         <ArrowLeft className="h-4 w-4" /> Back to employees
       </Link>
+
+      {emp.disabled_at && (
+        <div className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-5 py-3.5 text-sm text-amber-800">
+          <CalendarOff className="h-4 w-4 shrink-0" />
+          <span>
+            This account was <span className="font-semibold">disabled</span> on {formatDate(emp.disabled_at)}. The
+            employee can&apos;t sign in, and they&apos;re excluded from attendance and stats from{" "}
+            {formatMonthLabel(shiftMonthKey(emp.disabled_at.slice(0, 7), 1))} onward. All of their past records are
+            kept. Re-enable from the profile panel below.
+          </span>
+        </div>
+      )}
 
       {/* Monthly hours */}
       <div className="space-y-4">
@@ -292,6 +309,9 @@ export default async function EmployeeDetail({
             {emp.role === "ADMIN" && (
               <span className="badge mt-2 bg-brand-50 text-brand-700">Administrator</span>
             )}
+            {emp.disabled_at && (
+              <span className="badge mt-2 bg-amber-50 text-amber-700">Disabled</span>
+            )}
           </div>
           <dl className="mt-6 space-y-3.5 text-sm">
             <Row icon={<Mail className="h-4 w-4" />} label="Email" value={emp.email} />
@@ -311,6 +331,13 @@ export default async function EmployeeDetail({
           <ShiftEditForm employeeId={emp.id} initialStart={emp.shift_start} initialEnd={emp.shift_end} />
           <OffDaysEditForm employeeId={emp.id} initialOffDays={emp.off_days} />
           <DeviceMappingForm employeeId={emp.id} initialValue={emp.device_user_id} />
+          {emp.role !== "ADMIN" && (
+            <DisableEmployeeControl
+              employeeId={emp.id}
+              employeeName={emp.full_name}
+              disabledAt={emp.disabled_at}
+            />
+          )}
 
           <p className="mt-4 border-t border-slate-50 pt-4 text-xs text-slate-400">
             Registered {formatDate(emp.created_at)}

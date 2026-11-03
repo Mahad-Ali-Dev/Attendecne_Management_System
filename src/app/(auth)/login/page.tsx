@@ -1,10 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Loader2, LogIn } from "lucide-react";
+
+const DISABLED_MESSAGE =
+  "This account has been disabled. Please contact your administrator.";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -12,6 +15,16 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // The middleware sends a disabled employee here with ?disabled=1 after
+  // clearing their session, so they see why they were signed out. Read from
+  // the URL directly to avoid pulling in useSearchParams (and its Suspense
+  // requirement) on this otherwise fully client-side form.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("disabled") === "1") {
+      setError(DISABLED_MESSAGE);
+    }
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -25,16 +38,28 @@ export default function LoginPage() {
     });
 
     if (error) {
-      setError(error.message);
+      // A disabled employee's auth user is banned, so sign-in fails here —
+      // show the plain-English reason rather than the raw "user banned" text.
+      const banned = error.code === "user_banned" || /banned/i.test(error.message);
+      setError(banned ? DISABLED_MESSAGE : error.message);
       setLoading(false);
       return;
     }
 
     const { data: profile } = await supabase
       .from("profiles")
-      .select("role")
+      .select("role, disabled_at")
       .eq("id", data.user.id)
       .single();
+
+    // Belt-and-braces: if the auth ban somehow didn't block the sign-in, the
+    // profile flag still does — drop the session and keep them on this page.
+    if (profile?.disabled_at) {
+      await supabase.auth.signOut();
+      setError(DISABLED_MESSAGE);
+      setLoading(false);
+      return;
+    }
 
     router.replace(profile?.role === "ADMIN" ? "/admin" : "/dashboard");
     router.refresh();

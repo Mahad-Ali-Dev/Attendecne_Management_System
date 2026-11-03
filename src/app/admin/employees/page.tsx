@@ -14,14 +14,24 @@ export default async function EmployeesPage() {
     .select("*")
     .order("created_at", { ascending: false });
 
-  const employees = (data ?? []) as Profile[];
+  // Keep everyone on this management view — disabled employees included, so an
+  // admin can still open them and re-enable — but sort the active ones first
+  // and dim the disabled ones. A stable sort keeps the created_at order within
+  // each group.
+  const employees = ((data ?? []) as Profile[])
+    .map((e, i) => ({ e, i }))
+    .sort((a, b) => Number(!!a.e.disabled_at) - Number(!!b.e.disabled_at) || a.i - b.i)
+    .map(({ e }) => e);
+  const disabledCount = employees.filter((e) => e.disabled_at).length;
+  const activeCount = employees.length - disabledCount;
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-navy">Employees</h1>
         <p className="mt-1 text-sm text-slate-500">
-          {employees.length} registered {employees.length === 1 ? "member" : "members"}
+          {activeCount} active {activeCount === 1 ? "member" : "members"}
+          {disabledCount > 0 ? ` · ${disabledCount} disabled` : ""}
         </p>
       </div>
 
@@ -30,7 +40,7 @@ export default async function EmployeesPage() {
           <Link
             key={emp.id}
             href={`/admin/employees/${emp.id}`}
-            className="card group p-5 transition hover:shadow-soft"
+            className={`card group p-5 transition hover:shadow-soft${emp.disabled_at ? " opacity-60" : ""}`}
           >
             <div className="flex items-center gap-3">
               <Avatar name={emp.full_name} src={emp.avatar_url} size={48} />
@@ -39,6 +49,9 @@ export default async function EmployeesPage() {
                   <span className="truncate font-semibold text-navy">{emp.full_name}</span>
                   {emp.role === "ADMIN" && (
                     <span className="badge bg-brand-50 text-brand-700">Admin</span>
+                  )}
+                  {emp.disabled_at && (
+                    <span className="badge bg-amber-50 text-amber-700">Disabled</span>
                   )}
                 </div>
                 <div className="truncate text-sm text-slate-400">

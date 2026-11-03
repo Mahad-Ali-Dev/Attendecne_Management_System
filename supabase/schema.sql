@@ -26,6 +26,14 @@ create table if not exists public.profiles (
   -- different set here so their weekend hours count toward their totals
   -- instead of being silently skipped as "not a working day".
   off_days        integer[]   not null default '{0,6}',
+  -- The date an admin disabled this profile (employee left the company), or
+  -- NULL while they're active. Disabling never deletes anything: the row and
+  -- every attendance/salary/leave record it owns stay put. A disabled
+  -- employee can't sign in (their auth user is banned too), and they drop out
+  -- of attendance and stats from the month AFTER their disable month onward —
+  -- disabled 15 Oct still counts for all of October and every earlier month,
+  -- but not November or later. Re-enabling clears this back to NULL.
+  disabled_at     date,
   created_at      timestamptz not null default now()
 );
 
@@ -38,6 +46,9 @@ alter table public.profiles add column if not exists device_user_id text unique;
 -- Employees registered before custom weekly schedules existed still default
 -- to the standard Sat+Sun weekend.
 alter table public.profiles add column if not exists off_days integer[] not null default '{0,6}';
+-- Profiles created before the "disable instead of delete" feature existed are
+-- active (NULL) until an admin disables them.
+alter table public.profiles add column if not exists disabled_at date;
 
 -- ---------------------------------------------------------------------------
 -- 2. ATTENDANCE  (one row per employee per day)

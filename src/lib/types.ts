@@ -18,6 +18,8 @@ export interface Profile {
   device_user_id: string | null;
   /** Days of the week this employee is normally off (0=Sun .. 6=Sat). */
   off_days: number[];
+  /** Date (YYYY-MM-DD) the profile was disabled, or null while active. */
+  disabled_at: string | null;
   created_at: string;
 }
 

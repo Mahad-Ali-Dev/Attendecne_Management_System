@@ -6,6 +6,7 @@ import { DownloadReportButton } from "./DownloadReportButton";
 import { fetchAll } from "@/lib/fetchAll";
 import {
   formatMonthLabel,
+  isActiveInMonth,
   monthKeyOf,
   pktNow,
   shiftMonthKey,
@@ -105,9 +106,12 @@ export default async function AdminReportsPage({
   const leaveByUser = groupByUser(leaves);
   const sessionsByUser = groupByUser(sessions);
 
-  // Someone who registered after this month ended wasn't an employee yet.
+  // Someone who registered after this month ended wasn't an employee yet; and
+  // someone disabled before this month began has left — both drop out, while a
+  // disabled employee's leaving month and every earlier month still include
+  // them, so a past month's report never silently changes once they go.
   const employees = profiles.filter(
-    (e) => e.created_at.slice(0, 10) <= monthEnd,
+    (e) => e.created_at.slice(0, 10) <= monthEnd && isActiveInMonth(e.disabled_at, monthKey),
   );
 
   const rows = employees.map((emp) =>

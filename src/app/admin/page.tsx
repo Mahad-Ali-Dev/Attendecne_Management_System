@@ -5,7 +5,7 @@ import { Avatar } from "@/components/Avatar";
 import { StatCard } from "@/components/StatCard";
 import { StatusBadge } from "@/components/StatusBadge";
 import { DateNav } from "@/components/DateNav";
-import { formatDate, formatTime, hoursBetween, pktNow } from "@/lib/format";
+import { formatDate, formatTime, hoursBetween, isActiveInMonth, pktNow } from "@/lib/format";
 import type { Attendance, Profile } from "@/lib/types";
 import { Users, UserCheck, Clock3, UserX, LifeBuoy } from "lucide-react";
 
@@ -37,7 +37,12 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
     supabase.from("complaints").select("*", { count: "exact", head: true }).eq("status", "OPEN"),
   ]);
 
-  const employees = (profilesData ?? []) as Profile[];
+  // Disabled employees stay in the months up to and including the one they
+  // were disabled in, and drop off the roster for any day after that — so a
+  // day in a later month simply doesn't list them.
+  const employees = ((profilesData ?? []) as Profile[]).filter((e) =>
+    isActiveInMonth(e.disabled_at, dateKey.slice(0, 7))
+  );
   const attendance = (attendanceData ?? []) as Attendance[];
 
   const recordsByUser = new Map<string, Attendance[]>();

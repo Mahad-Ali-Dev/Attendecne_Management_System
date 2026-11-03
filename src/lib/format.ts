@@ -137,6 +137,19 @@ export function monthKeyOf(date: Date): string {
   return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
+/**
+ * Whether a profile still belongs in a given month's roster and stats.
+ * A disabled employee stays in the month they were disabled and every earlier
+ * month, and drops out of every later one — so disabling someone on 15 Oct
+ * leaves October and before intact but excludes them from November onward.
+ * `disabledAt` is their disable date ("YYYY-MM-DD"), or null while active;
+ * `monthKey` is the "YYYY-MM" month being viewed. Daily pages pass the viewed
+ * day's month (dateKey.slice(0, 7)).
+ */
+export function isActiveInMonth(disabledAt: string | null, monthKey: string): boolean {
+  return !disabledAt || monthKey <= disabledAt.slice(0, 7);
+}
+
 export function shiftMonthKey(monthKey: string, delta: number): string {
   const [y, m] = monthKey.split("-").map(Number);
   const d = new Date(Date.UTC(y, m - 1 + delta, 1));
