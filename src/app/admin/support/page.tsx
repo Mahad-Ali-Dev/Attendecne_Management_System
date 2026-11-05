@@ -13,7 +13,7 @@ export default async function AdminSupportPage() {
 
   const [{ data: complaintsData }, { data: profilesData }] = await Promise.all([
     supabase.from("complaints").select("*").order("created_at", { ascending: false }),
-    supabase.from("profiles").select("*").eq("role", "EMPLOYEE"),
+    supabase.from("profiles").select("*").neq("role", "ADMIN"),
   ]);
 
   const complaints = (complaintsData ?? []) as Complaint[];

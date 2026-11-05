@@ -20,7 +20,7 @@ export default async function AdminLeavePage({ searchParams }: { searchParams: {
 
   const [{ data: requestsData }, { data: profilesData }] = await Promise.all([
     supabase.from("leave_requests").select("*").order("created_at", { ascending: false }),
-    supabase.from("profiles").select("*").eq("role", "EMPLOYEE"),
+    supabase.from("profiles").select("*").neq("role", "ADMIN"),
   ]);
 
   const requests = (requestsData ?? []) as LeaveRequest[];

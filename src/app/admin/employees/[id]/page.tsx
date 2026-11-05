@@ -3,11 +3,14 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Avatar } from "@/components/Avatar";
 import { MonthlyHoursChart } from "@/components/MonthlyHoursChart";
+import { MonthlyReportCard } from "@/components/MonthlyReportCard";
 import { DeviceMappingForm } from "./DeviceMappingForm";
 import { ShiftEditForm } from "./ShiftEditForm";
 import { OffDaysEditForm } from "./OffDaysEditForm";
 import { DisableEmployeeControl } from "./DisableEmployeeControl";
 import { SupportAgentToggle } from "./SupportAgentToggle";
+import { TeamLeadToggle } from "./TeamLeadToggle";
+import { TeamMembersManager, type TeamPerson } from "./TeamMembersManager";
 import { AttendanceEditor } from "./AttendanceEditor";
 import { SalarySlipEditor } from "./SalarySlipEditor";
 import { EmployeeLeaveHistory } from "./EmployeeLeaveHistory";
@@ -17,7 +20,7 @@ import { HoursSection } from "./HoursSection";
 import { buildAttendanceHistory, buildMonthDayHours } from "@/lib/hours";
 import { leaveDatesSet } from "@/lib/payroll";
 import { requiredProductiveHours } from "@/lib/productivity";
-import { buildReportRow, REPORT_COLUMNS } from "@/lib/report";
+import { buildReportRow } from "@/lib/report";
 import { fetchAll } from "@/lib/fetchAll";
 import {
   formatDate,
@@ -54,19 +57,6 @@ import {
 } from "lucide-react";
 
 export const dynamic = "force-dynamic";
-
-// The monthly-report figures, grouped so the card reads top to bottom: the
-// day counts a by-the-day payroll needs first, then the hours view, then the
-// tracker view. Labels and values come straight from REPORT_COLUMNS, so this
-// card always shows exactly what the Reports tab does.
-const REPORT_GROUPS: { title: string; keys: string[] }[] = [
-  {
-    title: "Days",
-    keys: ["requiredDays", "presentDays", "absentDays", "leaves", "extraDays", "daysWorked", "paidWorkingDays"],
-  },
-  { title: "Hours", keys: ["requiredHours", "completedHours", "attendancePct"] },
-  { title: "Tracking", keys: ["requiredTracking", "completedTracking", "trackingPct"] },
-];
 
 export default async function EmployeeDetail({
   params,
@@ -164,7 +154,25 @@ export default async function EmployeeDetail({
     off_days: profileData.off_days ?? [0, 6],
     disabled_at: profileData.disabled_at ?? null,
     is_support: profileData.is_support ?? false,
+    team_lead_id: profileData.team_lead_id ?? null,
   } as Profile;
+
+  // When this employee is a team lead, load the staff list so the admin can see
+  // who's on the team and add/remove members. Members = those pointing at this
+  // lead; candidates = everyone else (non-admin) who could be added or moved in.
+  const isLead = emp.role === "TEAM_LEAD";
+  let teamMembers: TeamPerson[] = [];
+  let teamCandidates: TeamPerson[] = [];
+  if (isLead) {
+    const { data: staff } = await supabase
+      .from("profiles")
+      .select("id, full_name, position, department, avatar_url, team_lead_id")
+      .neq("role", "ADMIN")
+      .order("full_name");
+    const all = (staff ?? []) as (TeamPerson & { team_lead_id: string | null })[];
+    teamMembers = all.filter((p) => p.team_lead_id === emp.id);
+    teamCandidates = all.filter((p) => p.id !== emp.id && p.team_lead_id !== emp.id);
+  }
   const slips = (slipData ?? []) as SalarySlip[];
   const attendanceForSalary = (salaryAttData ?? []) as Attendance[];
   const leaveRequests = (leaveData ?? []) as LeaveRequest[];
@@ -193,7 +201,6 @@ export default async function EmployeeDetail({
   // The exact same month-row the Reports tab builds for this employee, so the
   // summary card below matches the Reports table figure-for-figure.
   const reportRow = buildReportRow(emp, monthKey, todayKey, hoursAttendance, approvedLeaveDates, productivitySessions);
-  const columnsByKey = new Map(REPORT_COLUMNS.map((c) => [c.key, c] as const));
 
   const workingDaysTotal = hoursDays.filter((d) => !d.isRestDay).length;
   const leaveDaysTotal = hoursDays.filter((d) => d.status === "ON_LEAVE").length;
@@ -243,6 +250,7 @@ export default async function EmployeeDetail({
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-xl font-bold text-navy">{emp.full_name}</h1>
               {isAdmin && <span className="badge bg-brand-50 text-brand-700">Administrator</span>}
+              {isLead && <span className="badge bg-violet-50 text-violet-700">Team lead</span>}
               {emp.is_support && <span className="badge bg-sky-50 text-sky-700">Support agent</span>}
               {emp.disabled_at && <span className="badge bg-amber-50 text-amber-700">Disabled</span>}
             </div>
@@ -268,6 +276,10 @@ export default async function EmployeeDetail({
           <Row icon={<MapPin className="h-4 w-4" />} label="Address" value={emp.address} />
         </dl>
       </div>
+
+      {isLead && (
+        <TeamMembersManager leadId={emp.id} members={teamMembers} candidates={teamCandidates} />
+      )}
 
       {/* 2 — Month toolbar (one selector drives the whole page) */}
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -304,38 +316,7 @@ export default async function EmployeeDetail({
       </div>
 
       {/* 3 — The report, laid out as readable tiles (same figures as the Reports tab) */}
-      <div className="card space-y-5 p-6">
-        <div>
-          <h3 className="font-semibold text-navy">This month at a glance</h3>
-          <p className="text-xs text-slate-400">
-            The same figures as the Reports tab. Highlighted tiles are the headline payroll numbers.
-          </p>
-        </div>
-        {REPORT_GROUPS.map((group) => (
-          <div key={group.title}>
-            <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">{group.title}</h4>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-              {group.keys.map((key) => {
-                const col = columnsByKey.get(key);
-                if (!col) return null;
-                return (
-                  <div
-                    key={key}
-                    className={`rounded-xl border p-3 ${
-                      col.strong ? "border-brand-100 bg-brand-50/60" : "border-slate-100 bg-slate-50/60"
-                    }`}
-                  >
-                    <div className="text-[11px] font-medium uppercase tracking-wide text-slate-400">{col.label}</div>
-                    <div className={`mt-1 text-lg font-bold ${col.strong ? "text-brand-700" : "text-navy"}`}>
-                      {col.value(reportRow)}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        ))}
-      </div>
+      <MonthlyReportCard row={reportRow} />
 
       {/* 4 — Daily hours: graph by default, full attendance table one tab away */}
       <HoursSection
@@ -398,6 +379,7 @@ export default async function EmployeeDetail({
           <OffDaysEditForm employeeId={emp.id} initialOffDays={emp.off_days} />
           <DeviceMappingForm employeeId={emp.id} initialValue={emp.device_user_id} />
           {!isAdmin && <SupportAgentToggle employeeId={emp.id} initialIsSupport={emp.is_support} />}
+          {!isAdmin && <TeamLeadToggle employeeId={emp.id} initialIsLead={isLead} />}
           {!isAdmin && (
             <DisableEmployeeControl employeeId={emp.id} employeeName={emp.full_name} disabledAt={emp.disabled_at} />
           )}

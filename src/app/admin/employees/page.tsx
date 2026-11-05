@@ -47,6 +47,9 @@ export default async function EmployeesPage() {
                   {emp.role === "ADMIN" && (
                     <span className="badge bg-brand-50 text-brand-700">Admin</span>
                   )}
+                  {emp.role === "TEAM_LEAD" && (
+                    <span className="badge bg-violet-50 text-violet-700">Lead</span>
+                  )}
                   {emp.disabled_at && (
                     <span className="badge bg-amber-50 text-amber-700">Disabled</span>
                   )}

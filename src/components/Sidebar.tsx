@@ -32,7 +32,7 @@ import {
 // per bell.
 const NOTIFICATION_POLL_MS = 300_000;
 
-function navItems(isAdmin: boolean, isSupport: boolean) {
+function navItems(isAdmin: boolean, isSupport: boolean, isTeamLead: boolean) {
   // Admins don't check in/out, so the personal dashboard & hours tracker aren't for them.
   if (isAdmin) {
     return [
@@ -49,6 +49,8 @@ function navItems(isAdmin: boolean, isSupport: boolean) {
   }
   return [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+    // Team leads get a view of their own team, on top of their personal screens.
+    ...(isTeamLead ? [{ href: "/dashboard/team", label: "My Team", icon: Users }] : []),
     { href: "/dashboard/hours", label: "Monthly Hours", icon: BarChart3 },
     { href: "/dashboard/productivity", label: "Productivity", icon: Activity },
     { href: "/dashboard/salary", label: "Salary Slip", icon: Wallet },
@@ -77,7 +79,7 @@ export function Sidebar({
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState(initialNotifications);
   const isAdmin = profile.role === "ADMIN";
-  const items = navItems(isAdmin, profile.is_support);
+  const items = navItems(isAdmin, profile.is_support, profile.role === "TEAM_LEAD");
   const homeHref = isAdmin ? "/admin" : "/dashboard";
 
   // One shared poll for both bell instances below (desktop + mobile) — they

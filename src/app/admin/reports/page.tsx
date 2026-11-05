@@ -69,7 +69,7 @@ export default async function AdminReportsPage({
       supabase
         .from("profiles")
         .select("*")
-        .eq("role", "EMPLOYEE")
+        .neq("role", "ADMIN")
         .order("full_name")
         .order("id")
         .range(from, to),

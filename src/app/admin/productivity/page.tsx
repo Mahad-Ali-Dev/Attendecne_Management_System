@@ -36,7 +36,7 @@ export default async function AdminProductivityPage({ searchParams }: { searchPa
     { data: categoriesData },
     { data: flaggedData },
   ] = await Promise.all([
-    supabase.from("profiles").select("*").eq("role", "EMPLOYEE").order("full_name"),
+    supabase.from("profiles").select("*").neq("role", "ADMIN").order("full_name"),
     supabase.from("productivity_sessions").select("*").eq("work_date", dateKey),
     // Desktop-agent per-app data — both the "Top App" column and the
     // drill-down modal's source.

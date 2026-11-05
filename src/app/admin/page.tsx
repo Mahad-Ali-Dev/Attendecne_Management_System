@@ -28,7 +28,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
     supabase
       .from("profiles")
       .select("*")
-      .eq("role", "EMPLOYEE")
+      .neq("role", "ADMIN")
       .order("full_name"),
     // Also pull the day before — an evening/night shift that started before
     // midnight is filed under the previous day's work_date, so a

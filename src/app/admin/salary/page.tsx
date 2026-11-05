@@ -24,7 +24,7 @@ export default async function AdminSalaryPage({
   const salaryLookback = new Date(Date.now() - 400 * 86_400_000).toISOString().slice(0, 10);
 
   const [{ data: profilesData }, { data: slipsData }, { data: attData }, { data: leaveData }] = await Promise.all([
-    supabase.from("profiles").select("*").eq("role", "EMPLOYEE").order("full_name"),
+    supabase.from("profiles").select("*").neq("role", "ADMIN").order("full_name"),
     // Every slip, every employee — the table figures out per-employee "this
     // month" vs. "most recent prior" (for carry-forward) on the client.
     supabase.from("salary_slips").select("*").order("month", { ascending: false }),

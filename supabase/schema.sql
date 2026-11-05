@@ -10,7 +10,7 @@ create table if not exists public.profiles (
   id           uuid primary key references auth.users (id) on delete cascade,
   full_name    text        not null,
   email        text        not null,
-  role         text        not null default 'EMPLOYEE' check (role in ('EMPLOYEE', 'ADMIN')),
+  role         text        not null default 'EMPLOYEE' check (role in ('EMPLOYEE', 'ADMIN', 'TEAM_LEAD')),
   cnic         text,
   phone        text,
   address      text,
@@ -38,6 +38,12 @@ create table if not exists public.profiles (
   -- at registration. Only support agents get the daily ticket-log screen and
   -- appear in the admin ticket report.
   is_support      boolean     not null default false,
+  -- The team lead this employee reports to (another profile whose role is
+  -- 'TEAM_LEAD'), or NULL if they're not on anyone's team. Admin-managed. A
+  -- team lead sees their members' attendance, hours, leave, productivity and
+  -- tickets on their My Team page. Self-referencing, cleared if the lead's
+  -- profile is ever deleted.
+  team_lead_id    uuid        references public.profiles (id) on delete set null,
   created_at      timestamptz not null default now()
 );
 
@@ -55,6 +61,12 @@ alter table public.profiles add column if not exists off_days integer[] not null
 alter table public.profiles add column if not exists disabled_at date;
 -- Customer-support flag, off by default — an admin turns it on per employee.
 alter table public.profiles add column if not exists is_support boolean not null default false;
+-- Team-lead role + team membership, added later. Widen the role check to allow
+-- 'TEAM_LEAD', then add the self-referencing link from a member to their lead.
+alter table public.profiles drop constraint if exists profiles_role_check;
+alter table public.profiles add constraint profiles_role_check check (role in ('EMPLOYEE', 'ADMIN', 'TEAM_LEAD'));
+alter table public.profiles add column if not exists team_lead_id uuid references public.profiles (id) on delete set null;
+create index if not exists profiles_team_lead_idx on public.profiles (team_lead_id);
 
 -- ---------------------------------------------------------------------------
 -- 2. ATTENDANCE  (one row per employee per day)
@@ -206,6 +218,23 @@ as $$
 $$;
 
 -- ---------------------------------------------------------------------------
+-- 3b. leads_member()  — is `member_id` on the signed-in user's team?
+-- SECURITY DEFINER so team-scoped policies on attendance / leave / tickets /
+-- productivity can check team_lead_id without recursing through RLS on profiles.
+-- ---------------------------------------------------------------------------
+create or replace function public.leads_member(member_id uuid)
+returns boolean
+language sql
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1 from public.profiles
+    where id = member_id and team_lead_id = auth.uid()
+  );
+$$;
+
+-- ---------------------------------------------------------------------------
 -- 4. ROW LEVEL SECURITY
 -- ---------------------------------------------------------------------------
 alter table public.profiles      enable row level security;
@@ -220,7 +249,7 @@ alter table public.ticket_reports enable row level security;
 -- profiles -------------------------------------------------------------------
 drop policy if exists "read own or admin reads all" on public.profiles;
 create policy "read own or admin reads all" on public.profiles
-  for select using (id = auth.uid() or public.is_admin());
+  for select using (id = auth.uid() or public.is_admin() or team_lead_id = auth.uid());
 
 drop policy if exists "update own profile" on public.profiles;
 create policy "update own profile" on public.profiles
@@ -234,7 +263,7 @@ create policy "admin updates any profile" on public.profiles
 -- attendance -----------------------------------------------------------------
 drop policy if exists "read own attendance or admin reads all" on public.attendance;
 create policy "read own attendance or admin reads all" on public.attendance
-  for select using (user_id = auth.uid() or public.is_admin());
+  for select using (user_id = auth.uid() or public.is_admin() or public.leads_member(user_id));
 
 drop policy if exists "insert own attendance" on public.attendance;
 create policy "insert own attendance" on public.attendance
@@ -273,7 +302,7 @@ create policy "admin updates any salary slip" on public.salary_slips
 -- leave requests ---------------------------------------------------------------
 drop policy if exists "read own leave or admin reads all" on public.leave_requests;
 create policy "read own leave or admin reads all" on public.leave_requests
-  for select using (user_id = auth.uid() or public.is_admin());
+  for select using (user_id = auth.uid() or public.is_admin() or public.leads_member(user_id));
 
 drop policy if exists "insert own leave request" on public.leave_requests;
 create policy "insert own leave request" on public.leave_requests
@@ -319,7 +348,7 @@ create policy "admin resolves any complaint" on public.complaints
 -- everyone's and fix any of them. Mirrors the attendance policy set.
 drop policy if exists "read own tickets or admin reads all" on public.ticket_reports;
 create policy "read own tickets or admin reads all" on public.ticket_reports
-  for select using (user_id = auth.uid() or public.is_admin());
+  for select using (user_id = auth.uid() or public.is_admin() or public.leads_member(user_id));
 
 drop policy if exists "insert own tickets" on public.ticket_reports;
 create policy "insert own tickets" on public.ticket_reports
@@ -341,6 +370,19 @@ create policy "admin updates any tickets" on public.ticket_reports
 drop policy if exists "admin deletes any tickets" on public.ticket_reports;
 create policy "admin deletes any tickets" on public.ticket_reports
   for delete using (public.is_admin());
+
+-- productivity sessions (tracker-owned) ---------------------------------------
+-- The desktop tracker creates these tables, not this file, so only add the
+-- team-lead read policy when the table is actually present. This is purely
+-- additive — it sits alongside whatever own/admin read policies already exist.
+do $$
+begin
+  if exists (select 1 from pg_tables where schemaname = 'public' and tablename = 'productivity_sessions') then
+    drop policy if exists "team lead reads team productivity" on public.productivity_sessions;
+    create policy "team lead reads team productivity" on public.productivity_sessions
+      for select using (public.leads_member(user_id));
+  end if;
+end $$;
 
 -- password reset codes --------------------------------------------------------
 -- No public policies at all: a forgot-password request happens before the

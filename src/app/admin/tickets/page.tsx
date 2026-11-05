@@ -31,7 +31,7 @@ export default async function AdminTicketsPage({
   const monthKey = requested > currentMonthKey ? currentMonthKey : requested; // no browsing into the future
 
   const [profilesData, allReports] = await Promise.all([
-    supabase.from("profiles").select("*").eq("role", "EMPLOYEE").eq("is_support", true).order("full_name"),
+    supabase.from("profiles").select("*").neq("role", "ADMIN").eq("is_support", true).order("full_name"),
     // Every ticket row, so we can show the selected month AND an all-time total
     // per agent in one pass. A unique order keeps the paging stable.
     fetchAll<TicketReport>((from, to) =>

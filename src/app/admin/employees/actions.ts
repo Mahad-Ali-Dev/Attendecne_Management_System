@@ -108,6 +108,72 @@ export async function setSupportAgent(employeeId: string, isSupport: boolean) {
   return { ok: true };
 }
 
+/**
+ * Promotes an employee to team lead, or demotes a lead back to a regular
+ * employee. A team lead is still an employee (keeps their own attendance,
+ * hours, salary) — the role just unlocks their My Team view and lets an admin
+ * assign members to them. Demoting a lead unassigns everyone who reported to
+ * them. Admins can't be team leads.
+ */
+export async function setTeamLead(employeeId: string, makeLead: boolean) {
+  const me = await requireAdmin();
+  if (employeeId === me.id) return { error: "That's your own account." };
+  const supabase = createClient();
+
+  const { data: target } = await supabase.from("profiles").select("role").eq("id", employeeId).single();
+  if (!target) return { error: "Employee not found." };
+  if (target.role === "ADMIN") return { error: "Admins can't be made team leads." };
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({ role: makeLead ? "TEAM_LEAD" : "EMPLOYEE" })
+    .eq("id", employeeId);
+  if (error) return { error: error.message };
+
+  // Demoting a lead: nobody reports to them any more.
+  if (!makeLead) {
+    await supabase.from("profiles").update({ team_lead_id: null }).eq("team_lead_id", employeeId);
+  }
+
+  revalidatePath(`/admin/employees/${employeeId}`);
+  revalidatePath("/admin/employees");
+  return { ok: true };
+}
+
+/** Admin adds an employee to a team lead's team (sets their team_lead_id). */
+export async function addTeamMember(leadId: string, memberId: string) {
+  await requireAdmin();
+  if (leadId === memberId) return { error: "A team lead can't be on their own team." };
+  const supabase = createClient();
+
+  const { data: rows } = await supabase.from("profiles").select("id, role").in("id", [leadId, memberId]);
+  const lead = rows?.find((r) => r.id === leadId);
+  const member = rows?.find((r) => r.id === memberId);
+  if (!lead || lead.role !== "TEAM_LEAD") return { error: "That person isn't a team lead." };
+  if (!member) return { error: "Employee not found." };
+  if (member.role === "ADMIN") return { error: "Admins can't be team members." };
+
+  const { error } = await supabase.from("profiles").update({ team_lead_id: leadId }).eq("id", memberId);
+  if (error) return { error: error.message };
+
+  revalidatePath(`/admin/employees/${leadId}`);
+  revalidatePath(`/admin/employees/${memberId}`);
+  return { ok: true };
+}
+
+/** Admin removes an employee from a team (clears their team_lead_id). */
+export async function removeTeamMember(leadId: string, memberId: string) {
+  await requireAdmin();
+  const supabase = createClient();
+
+  const { error } = await supabase.from("profiles").update({ team_lead_id: null }).eq("id", memberId);
+  if (error) return { error: error.message };
+
+  revalidatePath(`/admin/employees/${leadId}`);
+  revalidatePath(`/admin/employees/${memberId}`);
+  return { ok: true };
+}
+
 function timeToMinutes(time: string): number {
   const [h, m] = time.split(":").map(Number);
   return h * 60 + m;
