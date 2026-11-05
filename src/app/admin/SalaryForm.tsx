@@ -3,10 +3,10 @@
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { upsertSalarySlip } from "./actions";
-import { formatCurrency, formatHours, pktNow } from "@/lib/format";
-import { summarizeMonth, autoDeduction, autoBonus, leaveDatesSet } from "@/lib/payroll";
+import { formatCurrency, pktNow } from "@/lib/format";
+import { summarizeMonth, autoDeduction, autoBonus, dailyRate, leaveDatesSet } from "@/lib/payroll";
 import type { Attendance, LeaveRequest, SalarySlip } from "@/lib/types";
-import { Loader2, Clock, Target, TrendingDown, TrendingUp, CalendarCheck, CalendarOff, RefreshCw } from "lucide-react";
+import { Loader2, UserCheck, UserX, TrendingUp, CalendarCheck, CalendarOff, Wallet, RefreshCw } from "lucide-react";
 
 /**
  * The actual salary editing UI: attendance-vs-target breakdown, an
@@ -57,12 +57,17 @@ export function SalaryForm({
   );
 
   const basicSalaryNum = Number(basicSalary) || 0;
-  const suggestedDeduction = autoDeduction(basicSalaryNum, summary.expectedHours, summary.hoursShort);
-  const suggestedBonus = autoBonus(basicSalaryNum, summary.expectedHours, summary.hoursExtra);
-  const hourlyRate = summary.expectedHours > 0 ? basicSalaryNum / summary.expectedHours : 0;
+  const suggestedDeduction = autoDeduction(basicSalaryNum, summary.workingDays, summary.absentDays);
+  const suggestedBonus = autoBonus(basicSalaryNum, summary.workingDays, summary.extraDays);
+  const perDay = dailyRate(basicSalaryNum, summary.workingDays);
   const netPay = basicSalaryNum + (Number(allowances) || 0) - (Number(deductions) || 0);
-  const workedRatio =
-    summary.expectedHours > 0 ? Math.min(100, (summary.actualHours / summary.expectedHours) * 100) : 100;
+  // Paid days (present + approved leave) as a share of the month's working days.
+  const paidDays = summary.presentDays + summary.leaveDays;
+  const workedRatio = summary.workingDays > 0 ? Math.min(100, (paidDays / summary.workingDays) * 100) : 100;
+  // The same "Paid working days" the Reports tab shows (present + extra + leave),
+  // and the pay it works out to at the per-day rate.
+  const paidWorkingDays = summary.presentDays + summary.leaveDays + summary.extraDays;
+  const suggestedNet = Math.round(paidWorkingDays * perDay);
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -91,38 +96,48 @@ export function SalaryForm({
     <form onSubmit={onSubmit}>
       <div className="rounded-xl border border-slate-200 bg-white p-4">
         <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Attendance this month</p>
-        <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-5">
+        <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
           <MiniStat icon={<CalendarCheck className="h-4 w-4" />} label="Working days" value={summary.workingDays} />
+          <MiniStat icon={<UserCheck className="h-4 w-4" />} label="Present" value={summary.presentDays} />
           <MiniStat
             icon={<CalendarOff className="h-4 w-4" />}
             label="On leave"
             value={summary.leaveDays}
             accent={summary.leaveDays > 0 ? "text-brand-600" : "text-navy"}
           />
-          <MiniStat icon={<Clock className="h-4 w-4" />} label="Hours worked" value={formatHours(summary.actualHours)} />
-          <MiniStat icon={<Target className="h-4 w-4" />} label="Expected" value={formatHours(summary.expectedHours)} />
-          {summary.hoursExtra > 0 ? (
-            <MiniStat
-              icon={<TrendingUp className="h-4 w-4" />}
-              label="Extra"
-              value={formatHours(summary.hoursExtra)}
-              accent="text-emerald-600"
-            />
-          ) : (
-            <MiniStat
-              icon={<TrendingDown className="h-4 w-4" />}
-              label="Short"
-              value={formatHours(summary.hoursShort)}
-              accent={summary.hoursShort > 0 ? "text-red-600" : "text-emerald-600"}
-            />
-          )}
+          <MiniStat
+            icon={<UserX className="h-4 w-4" />}
+            label="Absent"
+            value={summary.absentDays}
+            accent={summary.absentDays > 0 ? "text-red-600" : "text-navy"}
+          />
+          <MiniStat
+            icon={<TrendingUp className="h-4 w-4" />}
+            label="Extra days"
+            value={summary.extraDays}
+            accent={summary.extraDays > 0 ? "text-emerald-600" : "text-navy"}
+          />
+          <MiniStat
+            icon={<Wallet className="h-4 w-4" />}
+            label="Paid working days"
+            value={paidWorkingDays}
+            accent="text-brand-600"
+          />
         </div>
         <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-100">
           <div
-            className={`h-full rounded-full transition-all ${summary.hoursShort > 0 ? "bg-amber-400" : "bg-emerald-500"}`}
+            className={`h-full rounded-full transition-all ${summary.absentDays > 0 ? "bg-amber-400" : "bg-emerald-500"}`}
             style={{ width: `${workedRatio}%` }}
           />
         </div>
+
+        {basicSalaryNum > 0 && (
+          <div className="mt-3 rounded-lg border border-brand-100 bg-brand-50/70 px-3 py-2.5 text-xs text-brand-700">
+            <span className="font-semibold">{paidWorkingDays} paid working days</span> (present + leave + extra) ×{" "}
+            {formatCurrency(perDay)}/day ≈{" "}
+            <span className="font-semibold">{formatCurrency(suggestedNet)}</span> suggested net pay
+          </div>
+        )}
 
         {summary.leaveDays > 0 && (
           <div className="mt-3 flex items-center gap-2 rounded-lg bg-brand-50 px-3 py-2.5 text-xs text-brand-700">
@@ -131,16 +146,16 @@ export function SalaryForm({
               <span className="font-semibold">
                 {summary.leaveDays} approved leave {summary.leaveDays === 1 ? "day" : "days"}
               </span>{" "}
-              excluded from expected hours this month — not counted toward the deduction below.
+              paid this month — not counted as absent, so not deducted below.
             </span>
           </div>
         )}
 
-        {summary.hoursShort > 0 && basicSalaryNum > 0 && (
+        {summary.absentDays > 0 && basicSalaryNum > 0 && (
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg bg-amber-50 px-3 py-2.5 text-xs text-amber-800">
             <span>
               Suggested deduction: <span className="font-semibold">{formatCurrency(suggestedDeduction)}</span>{" "}
-              ({formatHours(summary.hoursShort)} short × {formatCurrency(hourlyRate)}/hour)
+              ({summary.absentDays} absent {summary.absentDays === 1 ? "day" : "days"} × {formatCurrency(perDay)}/day)
             </span>
             <button
               type="button"
@@ -152,11 +167,11 @@ export function SalaryForm({
           </div>
         )}
 
-        {summary.hoursExtra > 0 && basicSalaryNum > 0 && (
+        {summary.extraDays > 0 && basicSalaryNum > 0 && (
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg bg-emerald-50 px-3 py-2.5 text-xs text-emerald-800">
             <span>
               Suggested bonus: <span className="font-semibold">{formatCurrency(suggestedBonus)}</span>{" "}
-              ({formatHours(summary.hoursExtra)} extra × {formatCurrency(hourlyRate)}/hour)
+              ({summary.extraDays} extra {summary.extraDays === 1 ? "day" : "days"} × {formatCurrency(perDay)}/day)
             </span>
             <button
               type="button"

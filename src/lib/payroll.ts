@@ -2,8 +2,16 @@ import { hoursDecimal, isWorkingDay, shiftLengthHours } from "./format";
 import type { Attendance, LeaveRequest } from "./types";
 
 export interface MonthAttendanceSummary {
+  /** Non-rest days in the month so far — basic pay is spread evenly across these. */
   workingDays: number;
+  /** Approved leave on working days — paid, so never deducted. */
   leaveDays: number;
+  /** Working days the employee attended (checked in). */
+  presentDays: number;
+  /** Working days missed (not attended, not on leave) — these drive the deduction. */
+  absentDays: number;
+  /** Rest days the employee worked anyway — these drive the bonus. */
+  extraDays: number;
   expectedHours: number;
   actualHours: number;
   hoursShort: number;
@@ -51,6 +59,9 @@ export function summarizeMonth(
 
   let workingDays = 0;
   let leaveDays = 0;
+  let presentDays = 0;
+  let absentDays = 0;
+  let extraDays = 0;
   let actualHours = 0;
   for (let d = 1; d <= daysInMonth; d++) {
     const dateObj = new Date(Date.UTC(year, month - 1, d));
@@ -64,10 +75,17 @@ export function summarizeMonth(
         leaveDays++;
         continue;
       }
-      if (rec) actualHours += hoursDecimal(rec.check_in, rec.check_out);
-    } else if (rec) {
-      // Worked a rest day: bonus hours, credited without counting the day
-      // itself as a working day (so expected hours don't move).
+      // Checked in → present and credited; otherwise a missed working day.
+      if (rec?.check_in) {
+        presentDays++;
+        actualHours += hoursDecimal(rec.check_in, rec.check_out);
+      } else {
+        absentDays++;
+      }
+    } else if (rec?.check_in) {
+      // Worked a rest day: counts as an extra day (and bonus hours), without
+      // counting toward working days so the normal roster is unchanged.
+      extraDays++;
       actualHours += hoursDecimal(rec.check_in, rec.check_out);
     }
   }
@@ -75,27 +93,29 @@ export function summarizeMonth(
   const expectedHours = (workingDays - leaveDays) * shiftHours;
   const hoursShort = Math.max(0, expectedHours - actualHours);
   const hoursExtra = Math.max(0, actualHours - expectedHours);
-  return { workingDays, leaveDays, expectedHours, actualHours, hoursShort, hoursExtra };
+  return { workingDays, leaveDays, presentDays, absentDays, extraDays, expectedHours, actualHours, hoursShort, hoursExtra };
+}
+
+/** A single day's pay: basic salary spread evenly across the month's working days. */
+export function dailyRate(basicSalary: number, workingDays: number): number {
+  return workingDays > 0 ? basicSalary / workingDays : 0;
 }
 
 /**
- * Deducts in proportion to hours missed against basic salary: being short
- * by one full shift's worth of hours (e.g. 9h on a 9-to-6 shift) costs
- * exactly one day's pay. Partial shortfalls deduct proportionally.
+ * Deducts a full day's pay for each working day the employee missed. Basic
+ * salary is spread evenly across the month's working days, so one absent day
+ * costs one day's pay. Approved leave is paid and never counted as absent.
  */
-export function autoDeduction(basicSalary: number, expectedHours: number, hoursShort: number): number {
-  if (expectedHours <= 0 || hoursShort <= 0) return 0;
-  const hourlyRate = basicSalary / expectedHours;
-  return Math.round(hoursShort * hourlyRate);
+export function autoDeduction(basicSalary: number, workingDays: number, absentDays: number): number {
+  if (workingDays <= 0 || absentDays <= 0) return 0;
+  return Math.round(absentDays * dailyRate(basicSalary, workingDays));
 }
 
 /**
- * Bonus in proportion to extra hours worked beyond expected — the mirror of
- * autoDeduction, using the same per-hour rate: a full extra shift's worth of
- * hours earns exactly one day's pay as a bonus.
+ * Bonus of one day's pay for each rest day worked — the mirror of
+ * autoDeduction, using the same per-day rate.
  */
-export function autoBonus(basicSalary: number, expectedHours: number, hoursExtra: number): number {
-  if (expectedHours <= 0 || hoursExtra <= 0) return 0;
-  const hourlyRate = basicSalary / expectedHours;
-  return Math.round(hoursExtra * hourlyRate);
+export function autoBonus(basicSalary: number, workingDays: number, extraDays: number): number {
+  if (workingDays <= 0 || extraDays <= 0) return 0;
+  return Math.round(extraDays * dailyRate(basicSalary, workingDays));
 }

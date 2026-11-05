@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { SalaryForm } from "../../SalaryForm";
 import { deleteSalarySlip } from "../actions";
 import { Modal } from "@/components/Modal";
-import { formatCurrency, formatHours, formatMonthLabel, pktNow } from "@/lib/format";
+import { formatCurrency, formatMonthLabel, pktNow } from "@/lib/format";
 import { summarizeMonth, leaveDatesSet } from "@/lib/payroll";
 import type { Attendance, LeaveRequest, SalarySlip } from "@/lib/types";
 import { Loader2, Pencil, Trash2 } from "lucide-react";
@@ -63,8 +63,8 @@ export function SalarySlipEditor({
       <div className="border-b border-slate-100 px-6 py-4">
         <h2 className="font-semibold text-navy">Salary</h2>
         <p className="text-xs text-slate-400">
-          Deductions can be calculated from attendance — short one full shift&apos;s worth of hours costs one
-          day&apos;s pay, proportionally.
+          Deductions can be calculated from attendance — each absent working day costs one day&apos;s pay, and a
+          rest day worked adds one.
         </p>
       </div>
 
@@ -108,7 +108,7 @@ export function SalarySlipEditor({
               <th className="px-6 py-3 font-medium">Basic</th>
               <th className="px-6 py-3 font-medium">Allowances</th>
               <th className="px-6 py-3 font-medium">Deductions</th>
-              <th className="px-6 py-3 font-medium">Hours vs target</th>
+              <th className="px-6 py-3 font-medium">Days vs target</th>
               <th className="px-6 py-3 font-medium">Net pay</th>
               <th className="px-6 py-3 font-medium"></th>
             </tr>
@@ -124,10 +124,14 @@ export function SalarySlipEditor({
                   <td className="px-6 py-3">{formatCurrency(s.allowances)}</td>
                   <td className="px-6 py-3">{formatCurrency(s.deductions)}</td>
                   <td className="px-6 py-3">
-                    {hist.hoursShort > 0 ? (
-                      <span className="text-amber-600">-{formatHours(hist.hoursShort)}</span>
-                    ) : hist.hoursExtra > 0 ? (
-                      <span className="text-emerald-600">+{formatHours(hist.hoursExtra)}</span>
+                    {hist.absentDays > 0 ? (
+                      <span className="text-amber-600">
+                        -{hist.absentDays} {hist.absentDays === 1 ? "day" : "days"}
+                      </span>
+                    ) : hist.extraDays > 0 ? (
+                      <span className="text-emerald-600">
+                        +{hist.extraDays} {hist.extraDays === 1 ? "day" : "days"}
+                      </span>
                     ) : (
                       <span className="text-slate-400">—</span>
                     )}
