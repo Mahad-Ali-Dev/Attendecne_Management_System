@@ -112,6 +112,10 @@ export default async function TeamMemberDetail({
   const leaveRequests = (leaveData ?? []) as LeaveRequest[];
   const sessions = (sessData ?? []) as ProductivitySession[];
   const approvedLeaveDates = leaveDatesSet(leaveRequests);
+  // Leave that touches the selected month, matching the attendance/productivity scope.
+  const monthLeaveRequests = leaveRequests.filter(
+    (lr) => lr.start_date <= monthEnd && lr.end_date >= monthStart
+  );
   const shiftHours = shiftLengthHours(member.shift_start, member.shift_end);
 
   const reportRow = buildReportRow(member, monthKey, todayKey, attendance, approvedLeaveDates, sessions);
@@ -159,36 +163,7 @@ export default async function TeamMemberDetail({
         <ArrowLeft className="h-4 w-4" /> Back to my team
       </Link>
 
-      {/* Identity (read-only) */}
-      <div className="card p-6">
-        <div className="flex flex-wrap items-start gap-4">
-          <Avatar name={member.full_name} src={member.avatar_url} size={72} />
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-xl font-bold text-navy">{member.full_name}</h1>
-              {member.is_support && <span className="badge bg-sky-50 text-sky-700">Support agent</span>}
-            </div>
-            <p className="mt-0.5 text-sm text-slate-500">
-              {member.position || "Employee"}
-              {member.department ? ` · ${member.department}` : ""}
-            </p>
-          </div>
-        </div>
-        <dl className="mt-5 grid grid-cols-1 gap-x-8 gap-y-4 border-t border-slate-50 pt-5 text-sm sm:grid-cols-2 lg:grid-cols-3">
-          <Row icon={<Mail className="h-4 w-4" />} label="Email" value={member.email} />
-          <Row icon={<Phone className="h-4 w-4" />} label="Phone" value={member.phone} />
-          <Row icon={<Building2 className="h-4 w-4" />} label="Department" value={member.department} />
-          <Row icon={<Briefcase className="h-4 w-4" />} label="Position" value={member.position} />
-          <Row
-            icon={<Clock className="h-4 w-4" />}
-            label="Shift"
-            value={`${formatTimeOfDay(member.shift_start)} – ${formatTimeOfDay(member.shift_end)}`}
-          />
-          <Row icon={<CalendarOff className="h-4 w-4" />} label="Rest days" value={formatOffDays(member.off_days)} />
-        </dl>
-      </div>
-
-      {/* Month toolbar */}
+      {/* Monthly review header + month selector */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold text-navy">Monthly review</h2>
@@ -221,7 +196,48 @@ export default async function TeamMemberDetail({
         </div>
       </div>
 
-      <MonthlyReportCard row={reportRow} />
+      {/* Monthly report (≈60%) beside the member detail card (≈40%). The detail
+          card comes first in the DOM so it leads on a phone, and moves right on
+          wide screens. */}
+      <div className="grid items-start gap-6 lg:grid-cols-5">
+        {/* Detail card (read-only) */}
+        <div className="lg:order-2 lg:col-span-2">
+          <div className="card p-6">
+            <div className="flex items-start gap-4">
+              <Avatar name={member.full_name} src={member.avatar_url} size={64} />
+              <div className="min-w-0 flex-1">
+                <h1 className="text-lg font-bold leading-tight text-navy">{member.full_name}</h1>
+                <p className="mt-0.5 text-sm text-slate-500">
+                  {member.position || "Employee"}
+                  {member.department ? ` · ${member.department}` : ""}
+                </p>
+              </div>
+            </div>
+            {member.is_support && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                <span className="badge bg-sky-50 text-sky-700">Support agent</span>
+              </div>
+            )}
+            <dl className="mt-5 space-y-4 border-t border-slate-50 pt-5 text-sm">
+              <Row icon={<Mail className="h-4 w-4" />} label="Email" value={member.email} />
+              <Row icon={<Phone className="h-4 w-4" />} label="Phone" value={member.phone} />
+              <Row icon={<Building2 className="h-4 w-4" />} label="Department" value={member.department} />
+              <Row icon={<Briefcase className="h-4 w-4" />} label="Position" value={member.position} />
+              <Row
+                icon={<Clock className="h-4 w-4" />}
+                label="Shift"
+                value={`${formatTimeOfDay(member.shift_start)} – ${formatTimeOfDay(member.shift_end)}`}
+              />
+              <Row icon={<CalendarOff className="h-4 w-4" />} label="Rest days" value={formatOffDays(member.off_days)} />
+            </dl>
+          </div>
+        </div>
+
+        {/* Monthly report */}
+        <div className="lg:order-1 lg:col-span-3">
+          <MonthlyReportCard row={reportRow} />
+        </div>
+      </div>
 
       {/* Daily hours: graph by default, read-only attendance table one tab away */}
       <ChartTableTabs
@@ -344,10 +360,10 @@ export default async function TeamMemberDetail({
       <div className="card overflow-hidden">
         <div className="border-b border-slate-100 px-6 py-4">
           <h3 className="font-semibold text-navy">Leave</h3>
-          <p className="text-xs text-slate-400">All of this member&apos;s requests.</p>
+          <p className="text-xs text-slate-400">Requests in {monthLabel}.</p>
         </div>
-        {leaveRequests.length === 0 ? (
-          <p className="px-6 py-10 text-center text-sm text-slate-400">No leave requests yet.</p>
+        {monthLeaveRequests.length === 0 ? (
+          <p className="px-6 py-10 text-center text-sm text-slate-400">No leave requests in {monthLabel}.</p>
         ) : (
           <table className="w-full text-sm">
             <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-400">
@@ -358,7 +374,7 @@ export default async function TeamMemberDetail({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
-              {leaveRequests.map((lr) => (
+              {monthLeaveRequests.map((lr) => (
                 <tr key={lr.id} className="text-slate-600">
                   <td className="px-6 py-3 font-medium text-navy">
                     {formatDate(lr.start_date)}

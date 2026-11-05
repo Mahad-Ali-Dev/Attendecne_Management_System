@@ -9,7 +9,14 @@ import { formatDate } from "@/lib/format";
 import type { LeaveRequest } from "@/lib/types";
 import { Check, X, Loader2 } from "lucide-react";
 
-export function EmployeeLeaveHistory({ requests }: { requests: LeaveRequest[] }) {
+export function EmployeeLeaveHistory({
+  requests,
+  monthLabel,
+}: {
+  requests: LeaveRequest[];
+  /** When set, the list is already scoped to this month — reflected in the copy. */
+  monthLabel?: string;
+}) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [actingId, setActingId] = useState<string | null>(null);
@@ -32,14 +39,20 @@ export function EmployeeLeaveHistory({ requests }: { requests: LeaveRequest[] })
       <div className="border-b border-slate-100 px-6 py-4">
         <h2 className="font-semibold text-navy">Leave</h2>
         <p className="text-xs text-slate-400">
-          {approvedCount > 0
-            ? `${approvedCount} approved leave ${approvedCount === 1 ? "day" : "days"} on record.`
-            : "No approved leave yet."}
+          {monthLabel
+            ? approvedCount > 0
+              ? `${approvedCount} approved in ${monthLabel}.`
+              : `No approved leave in ${monthLabel}.`
+            : approvedCount > 0
+              ? `${approvedCount} approved leave on record.`
+              : "No approved leave yet."}
         </p>
       </div>
 
       {requests.length === 0 ? (
-        <p className="px-6 py-10 text-center text-sm text-slate-400">No leave requests from this employee yet.</p>
+        <p className="px-6 py-10 text-center text-sm text-slate-400">
+          {monthLabel ? `No leave requests in ${monthLabel}.` : "No leave requests from this employee yet."}
+        </p>
       ) : (
         <table className="w-full text-sm">
           <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-400">

@@ -4,13 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import { Avatar } from "@/components/Avatar";
 import { MonthlyHoursChart } from "@/components/MonthlyHoursChart";
 import { MonthlyReportCard } from "@/components/MonthlyReportCard";
-import { DeviceMappingForm } from "./DeviceMappingForm";
-import { ShiftEditForm } from "./ShiftEditForm";
-import { OffDaysEditForm } from "./OffDaysEditForm";
-import { DisableEmployeeControl } from "./DisableEmployeeControl";
-import { SupportAgentToggle } from "./SupportAgentToggle";
-import { TeamLeadToggle } from "./TeamLeadToggle";
 import { TeamMembersManager, type TeamPerson } from "./TeamMembersManager";
+import { EmployeeSettingsButton } from "./EmployeeSettingsButton";
 import { AttendanceEditor } from "./AttendanceEditor";
 import { SalarySlipEditor } from "./SalarySlipEditor";
 import { EmployeeLeaveHistory } from "./EmployeeLeaveHistory";
@@ -215,6 +210,12 @@ export default async function EmployeeDetail({
   const ticketsThisMonth = monthTicketRows.reduce((sum, r) => sum + r.tickets_solved, 0);
   const ticketsAllTime = ticketRows.reduce((sum, r) => sum + r.tickets_solved, 0);
 
+  // Leave requests that touch the selected month, so the Leave section is
+  // scoped the same way attendance and productivity are.
+  const monthLeaveRequests = leaveRequests.filter(
+    (lr) => lr.start_date <= hoursMonthEnd && lr.end_date >= hoursMonthStart
+  );
+
   const monthLabel = formatMonthLabel(monthKey);
   const prevMonthKey = shiftMonthKey(monthKey, -1);
   const nextMonthKey = shiftMonthKey(monthKey, 1);
@@ -242,46 +243,7 @@ export default async function EmployeeDetail({
         </div>
       )}
 
-      {/* 1 — Who this is */}
-      <div className="card p-6">
-        <div className="flex flex-wrap items-start gap-4">
-          <Avatar name={emp.full_name} src={emp.avatar_url} size={72} />
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-xl font-bold text-navy">{emp.full_name}</h1>
-              {isAdmin && <span className="badge bg-brand-50 text-brand-700">Administrator</span>}
-              {isLead && <span className="badge bg-violet-50 text-violet-700">Team lead</span>}
-              {emp.is_support && <span className="badge bg-sky-50 text-sky-700">Support agent</span>}
-              {emp.disabled_at && <span className="badge bg-amber-50 text-amber-700">Disabled</span>}
-            </div>
-            <p className="mt-0.5 text-sm text-slate-500">
-              {emp.position || "Employee"}
-              {emp.department ? ` · ${emp.department}` : ""}
-            </p>
-          </div>
-          <div className="text-right text-xs text-slate-400">Joined {formatDate(emp.created_at)}</div>
-        </div>
-        <dl className="mt-5 grid grid-cols-1 gap-x-8 gap-y-4 border-t border-slate-50 pt-5 text-sm sm:grid-cols-2 lg:grid-cols-3">
-          <Row icon={<Mail className="h-4 w-4" />} label="Email" value={emp.email} />
-          <Row icon={<Phone className="h-4 w-4" />} label="Phone" value={emp.phone} />
-          <Row icon={<IdCard className="h-4 w-4" />} label="CNIC" value={emp.cnic} />
-          <Row icon={<Building2 className="h-4 w-4" />} label="Department" value={emp.department} />
-          <Row icon={<Briefcase className="h-4 w-4" />} label="Position" value={emp.position} />
-          <Row
-            icon={<Clock className="h-4 w-4" />}
-            label="Shift"
-            value={`${formatTimeOfDay(emp.shift_start)} – ${formatTimeOfDay(emp.shift_end)}`}
-          />
-          <Row icon={<CalendarOff className="h-4 w-4" />} label="Rest days" value={formatOffDays(emp.off_days)} />
-          <Row icon={<MapPin className="h-4 w-4" />} label="Address" value={emp.address} />
-        </dl>
-      </div>
-
-      {isLead && (
-        <TeamMembersManager leadId={emp.id} members={teamMembers} candidates={teamCandidates} />
-      )}
-
-      {/* 2 — Month toolbar (one selector drives the whole page) */}
+      {/* Monthly report header + month selector (drives the whole page) */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold text-navy">Monthly report</h2>
@@ -315,8 +277,72 @@ export default async function EmployeeDetail({
         </div>
       </div>
 
-      {/* 3 — The report, laid out as readable tiles (same figures as the Reports tab) */}
-      <MonthlyReportCard row={reportRow} />
+      {/* Monthly report (≈70%) beside the employee detail card (≈30%). The
+          detail card comes first in the DOM so it leads on a phone, and moves
+          to the right on wide screens. */}
+      <div className="grid items-start gap-6 lg:grid-cols-5">
+        {/* Detail card */}
+        <div className="lg:order-2 lg:col-span-2">
+          <div className="card p-6">
+            <div className="flex items-start gap-4">
+              <Avatar name={emp.full_name} src={emp.avatar_url} size={64} />
+              <div className="min-w-0 flex-1">
+                <h1 className="text-lg font-bold leading-tight text-navy">{emp.full_name}</h1>
+                <p className="mt-0.5 text-sm text-slate-500">
+                  {emp.position || "Employee"}
+                  {emp.department ? ` · ${emp.department}` : ""}
+                </p>
+              </div>
+              <EmployeeSettingsButton
+                employeeId={emp.id}
+                employeeName={emp.full_name}
+                shiftStart={emp.shift_start}
+                shiftEnd={emp.shift_end}
+                offDays={emp.off_days}
+                deviceUserId={emp.device_user_id}
+                isSupport={emp.is_support}
+                isLead={isLead}
+                disabledAt={emp.disabled_at}
+                isAdmin={isAdmin}
+              />
+            </div>
+            {(isAdmin || isLead || emp.is_support || emp.disabled_at) && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {isAdmin && <span className="badge bg-brand-50 text-brand-700">Administrator</span>}
+                {isLead && <span className="badge bg-violet-50 text-violet-700">Team lead</span>}
+                {emp.is_support && <span className="badge bg-sky-50 text-sky-700">Support agent</span>}
+                {emp.disabled_at && <span className="badge bg-amber-50 text-amber-700">Disabled</span>}
+              </div>
+            )}
+            <dl className="mt-5 space-y-4 border-t border-slate-50 pt-5 text-sm">
+              <Row icon={<Mail className="h-4 w-4" />} label="Email" value={emp.email} />
+              <Row icon={<Phone className="h-4 w-4" />} label="Phone" value={emp.phone} />
+              <Row icon={<IdCard className="h-4 w-4" />} label="CNIC" value={emp.cnic} />
+              <Row icon={<Building2 className="h-4 w-4" />} label="Department" value={emp.department} />
+              <Row icon={<Briefcase className="h-4 w-4" />} label="Position" value={emp.position} />
+              <Row
+                icon={<Clock className="h-4 w-4" />}
+                label="Shift"
+                value={`${formatTimeOfDay(emp.shift_start)} – ${formatTimeOfDay(emp.shift_end)}`}
+              />
+              <Row icon={<CalendarOff className="h-4 w-4" />} label="Rest days" value={formatOffDays(emp.off_days)} />
+              <Row icon={<MapPin className="h-4 w-4" />} label="Address" value={emp.address} />
+            </dl>
+            <p className="mt-4 border-t border-slate-50 pt-4 text-xs text-slate-400">
+              Joined {formatDate(emp.created_at)}
+            </p>
+          </div>
+        </div>
+
+        {/* Monthly report */}
+        <div className="lg:order-1 lg:col-span-3">
+          <MonthlyReportCard row={reportRow} />
+        </div>
+      </div>
+
+      {isLead && (
+        <TeamMembersManager leadId={emp.id} members={teamMembers} candidates={teamCandidates} />
+      )}
 
       {/* 4 — Daily hours: graph by default, full attendance table one tab away */}
       <HoursSection
@@ -367,24 +393,8 @@ export default async function EmployeeDetail({
         shiftEnd={emp.shift_end}
         offDays={emp.off_days}
       />
-      <EmployeeLeaveHistory requests={leaveRequests} />
+      <EmployeeLeaveHistory requests={monthLeaveRequests} monthLabel={monthLabel} />
 
-      {/* 8 — Admin settings, kept at the bottom and out of the way */}
-      <div className="card p-6">
-        <h3 className="font-semibold text-navy">Employee settings</h3>
-        <p className="text-xs text-slate-400">Shift, rest days, device mapping and account access.</p>
-        {/* Two columns on wider screens so the controls don't make a tall column. */}
-        <div className="grid grid-cols-1 gap-x-8 lg:grid-cols-2">
-          <ShiftEditForm employeeId={emp.id} initialStart={emp.shift_start} initialEnd={emp.shift_end} />
-          <OffDaysEditForm employeeId={emp.id} initialOffDays={emp.off_days} />
-          <DeviceMappingForm employeeId={emp.id} initialValue={emp.device_user_id} />
-          {!isAdmin && <SupportAgentToggle employeeId={emp.id} initialIsSupport={emp.is_support} />}
-          {!isAdmin && <TeamLeadToggle employeeId={emp.id} initialIsLead={isLead} />}
-          {!isAdmin && (
-            <DisableEmployeeControl employeeId={emp.id} employeeName={emp.full_name} disabledAt={emp.disabled_at} />
-          )}
-        </div>
-      </div>
     </div>
   );
 }
