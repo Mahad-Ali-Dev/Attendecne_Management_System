@@ -325,9 +325,10 @@ drop policy if exists "insert own tickets" on public.ticket_reports;
 create policy "insert own tickets" on public.ticket_reports
   for insert with check (user_id = auth.uid());
 
+-- Deliberately no "update own tickets" policy: a day's count is logged once and
+-- is final for the agent — only an admin may correct it (admin policy below).
+-- Drop it in case an earlier version of this file created one.
 drop policy if exists "update own tickets" on public.ticket_reports;
-create policy "update own tickets" on public.ticket_reports
-  for update using (user_id = auth.uid()) with check (user_id = auth.uid());
 
 drop policy if exists "admin inserts any tickets" on public.ticket_reports;
 create policy "admin inserts any tickets" on public.ticket_reports
