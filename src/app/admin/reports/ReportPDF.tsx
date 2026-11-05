@@ -7,10 +7,12 @@ import { REPORT_COLUMNS, type ReportRow } from "@/lib/report";
 // ("Sid-diqui-Khan"). Lines still wrap at spaces and at hyphens already in the text.
 Font.registerHyphenationCallback((word) => [word]);
 
-// Column widths as percentages of the table: the name column plus one entry
-// per REPORT_COLUMNS item, in the same order (sums to 100).
+// Column widths as percentages of the table: one entry per REPORT_COLUMNS
+// item, in the same order, and NAME_WIDTH + these sum to 100. Keep this list
+// the same length as REPORT_COLUMNS — a missing entry leaves a column with no
+// width.
 const NAME_WIDTH = 17;
-const COLUMN_WIDTHS = [8, 8, 8, 8, 6, 5.5, 5, 5.5, 5.5, 8.5, 7.5, 7.5];
+const COLUMN_WIDTHS = [7.5, 7.5, 7.5, 7.5, 6, 5, 5, 5, 5, 6.5, 6.5, 7, 7];
 
 const styles = StyleSheet.create({
   page: { paddingTop: 28, paddingHorizontal: 28, paddingBottom: 44, fontSize: 8, fontFamily: "Helvetica", color: "#0b1b2e" },
@@ -108,8 +110,9 @@ export function ReportDocument({
         ))}
 
         <Text style={styles.note}>
-          Required days and hours exclude rest days and approved leave. Extra days are rest days the employee worked.
-          Total days worked = Present days + Extra days. Absent days do not include today.
+          Rest days are excluded throughout. Required days are the month&apos;s working days (approved leave included);
+          Required hours exclude approved leave. Extra days are rest days the employee worked. Total days worked =
+          Present + Extra days. Paid working days = Present + Extra days + Leaves. Absent days do not include today.
         </Text>
 
         <View style={styles.footer} fixed>

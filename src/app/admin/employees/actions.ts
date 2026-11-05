@@ -87,6 +87,27 @@ export async function setEmployeeDisabled(employeeId: string, disabled: boolean)
   return { ok: true };
 }
 
+/**
+ * Marks an employee as a customer-support agent (or clears it). Only support
+ * agents get the daily ticket-log screen and show up in the admin ticket
+ * report, so this is what opens the feature up for someone.
+ */
+export async function setSupportAgent(employeeId: string, isSupport: boolean) {
+  await requireAdmin();
+  const supabase = createClient();
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({ is_support: isSupport })
+    .eq("id", employeeId);
+
+  if (error) return { error: error.message };
+
+  revalidatePath(`/admin/employees/${employeeId}`);
+  revalidatePath("/admin/tickets");
+  return { ok: true };
+}
+
 function timeToMinutes(time: string): number {
   const [h, m] = time.split(":").map(Number);
   return h * 60 + m;

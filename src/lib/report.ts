@@ -9,7 +9,7 @@ export interface ReportRow {
   name: string;
   department: string | null;
   position: string | null;
-  /** Days they were required to work: the month's working days, less approved leave. */
+  /** Required days: the month's working days (rest days excluded, approved leave NOT subtracted). */
   workingDays: number;
   /** Required days they checked in on — a day counts once they check in, whatever the hours. */
   presentDays: number;
@@ -52,14 +52,23 @@ export const REPORT_COLUMNS: ReportColumn[] = [
   { key: "completedHours", label: "Completed hours", value: (r) => formatHours(r.completedHours) },
   { key: "requiredTracking", label: "Required tracking", value: (r) => formatHours(r.requiredTrackingHours) },
   { key: "completedTracking", label: "Completed tracking", value: (r) => formatHours(r.trackedHours) },
-  // The day columns: days required first and total days worked last, both bold
-  // because a payroll by the day needs those two, with the breakdown between.
+  // The day columns, in payroll reading order: required days first, then how
+  // that split out (present, absent, leave, extra), then the two bold totals a
+  // by-the-day payroll needs — days actually worked, and days actually paid.
   { key: "requiredDays", label: "Required days", strong: true, value: (r) => String(r.workingDays) },
   { key: "presentDays", label: "Present days", value: (r) => String(r.presentDays) },
-  { key: "extraDays", label: "Extra days", value: (r) => String(r.extraDays) },
   { key: "absentDays", label: "Absent days", value: (r) => String(r.absentDays) },
   { key: "leaves", label: "Leaves", value: (r) => String(r.leaveDays) },
+  { key: "extraDays", label: "Extra days", value: (r) => String(r.extraDays) },
   { key: "daysWorked", label: "Total days worked", strong: true, value: (r) => String(r.presentDays + r.extraDays) },
+  // Every day the employee is paid for: days worked (present + extra) plus
+  // approved paid leave.
+  {
+    key: "paidWorkingDays",
+    label: "Paid working days",
+    strong: true,
+    value: (r) => String(r.presentDays + r.extraDays + r.leaveDays),
+  },
   { key: "attendancePct", label: "Attendance", value: (r) => pct(percentOf(r.completedHours, r.requiredHours)) },
   { key: "trackingPct", label: "Tracking", value: (r) => pct(percentOf(r.trackedHours, r.requiredTrackingHours)) },
 ];
@@ -86,7 +95,13 @@ export function buildReportRow(
 
   const attended = (d: DayHours) => d.status === "MET" || d.status === "PARTIAL";
   const leaveDays = days.filter((d) => !d.isRestDay && leaveDates.has(d.date)).length;
-  const workingDays = days.filter((d) => !d.isRestDay).length - leaveDays;
+  // Required days is the month's full working-day count — approved leave is NOT
+  // subtracted, since an approved leave day was still a day the employee was
+  // rostered for. (This matches the employee detail page's "Working days".)
+  const workingDays = days.filter((d) => !d.isRestDay).length;
+  // The HOURS requirement still excuses approved leave, so time off never drags
+  // down completed-vs-required hours or the attendance %.
+  const netWorkingDays = workingDays - leaveDays;
 
   return {
     id: employee.id,
@@ -99,9 +114,9 @@ export function buildReportRow(
     absentDays: days.filter((d) => d.status === "ABSENT" && d.date !== todayKey).length,
     leaveDays,
     extraDays: days.filter((d) => d.isRestDay && attended(d)).length,
-    requiredHours: workingDays * shiftHours,
+    requiredHours: netWorkingDays * shiftHours,
     completedHours: toWholeMinutes(days.reduce((sum, d) => sum + d.hours, 0)),
-    requiredTrackingHours: workingDays * requiredProductiveHours(shiftHours),
+    requiredTrackingHours: netWorkingDays * requiredProductiveHours(shiftHours),
     trackedHours: toWholeMinutes(sessions.reduce((sum, s) => sum + s.total_productive_seconds, 0) / 3600),
   };
 }

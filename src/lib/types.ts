@@ -20,7 +20,20 @@ export interface Profile {
   off_days: number[];
   /** Date (YYYY-MM-DD) the profile was disabled, or null while active. */
   disabled_at: string | null;
+  /** Whether this employee is a customer-support agent (admin-set). */
+  is_support: boolean;
   created_at: string;
+}
+
+/** One support agent's ticket tally for a single day. */
+export interface TicketReport {
+  id: string;
+  user_id: string;
+  work_date: string;
+  tickets_solved: number;
+  note: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface Attendance {

@@ -20,6 +20,7 @@ import {
   Activity,
   Download,
   FileBarChart,
+  Ticket,
   Menu,
   X,
 } from "lucide-react";
@@ -31,7 +32,7 @@ import {
 // per bell.
 const NOTIFICATION_POLL_MS = 300_000;
 
-function navItems(isAdmin: boolean) {
+function navItems(isAdmin: boolean, isSupport: boolean) {
   // Admins don't check in/out, so the personal dashboard & hours tracker aren't for them.
   if (isAdmin) {
     return [
@@ -40,6 +41,7 @@ function navItems(isAdmin: boolean) {
       { href: "/admin/productivity", label: "Productivity", icon: Activity },
       { href: "/admin/salary", label: "Salary", icon: Wallet },
       { href: "/admin/reports", label: "Reports", icon: FileBarChart },
+      { href: "/admin/tickets", label: "Tickets", icon: Ticket },
       { href: "/admin/leave", label: "Leave", icon: CalendarOff },
       { href: "/admin/support", label: "Support", icon: LifeBuoy },
       { href: "/admin/downloads", label: "Tracker", icon: Download },
@@ -51,6 +53,8 @@ function navItems(isAdmin: boolean) {
     { href: "/dashboard/productivity", label: "Productivity", icon: Activity },
     { href: "/dashboard/salary", label: "Salary Slip", icon: Wallet },
     { href: "/dashboard/leave", label: "Leave", icon: CalendarOff },
+    // Only customer-support agents log tickets.
+    ...(isSupport ? [{ href: "/dashboard/tickets", label: "Tickets", icon: Ticket }] : []),
     { href: "/dashboard/support", label: "Support", icon: LifeBuoy },
     { href: "/dashboard/downloads", label: "Tracker", icon: Download },
   ];
@@ -73,7 +77,7 @@ export function Sidebar({
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState(initialNotifications);
   const isAdmin = profile.role === "ADMIN";
-  const items = navItems(isAdmin);
+  const items = navItems(isAdmin, profile.is_support);
   const homeHref = isAdmin ? "/admin" : "/dashboard";
 
   // One shared poll for both bell instances below (desktop + mobile) — they

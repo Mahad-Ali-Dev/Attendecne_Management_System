@@ -9,19 +9,16 @@ export const dynamic = "force-dynamic";
 
 export default async function EmployeesPage() {
   const supabase = createClient();
-  const { data } = await supabase
-    .from("profiles")
-    .select("*")
-    .order("created_at", { ascending: false });
+  const { data } = await supabase.from("profiles").select("*").order("full_name");
 
   // Keep everyone on this management view — disabled employees included, so an
-  // admin can still open them and re-enable — but sort the active ones first
-  // and dim the disabled ones. A stable sort keeps the created_at order within
-  // each group.
-  const employees = ((data ?? []) as Profile[])
-    .map((e, i) => ({ e, i }))
-    .sort((a, b) => Number(!!a.e.disabled_at) - Number(!!b.e.disabled_at) || a.i - b.i)
-    .map(({ e }) => e);
+  // admin can still open them and re-enable — but dim the disabled ones and sort
+  // them to the end. Within each group, list by name A–Z (case-insensitive).
+  const employees = ((data ?? []) as Profile[]).slice().sort(
+    (a, b) =>
+      Number(!!a.disabled_at) - Number(!!b.disabled_at) ||
+      a.full_name.localeCompare(b.full_name, undefined, { sensitivity: "base" })
+  );
   const disabledCount = employees.filter((e) => e.disabled_at).length;
   const activeCount = employees.length - disabledCount;
 

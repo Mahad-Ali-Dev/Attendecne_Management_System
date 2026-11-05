@@ -34,6 +34,7 @@ export const getCurrentProfile = cache(async (): Promise<Profile> => {
     ...profile,
     off_days: profile.off_days ?? [0, 6],
     disabled_at: profile.disabled_at ?? null,
+    is_support: profile.is_support ?? false,
   } as Profile;
 });
 

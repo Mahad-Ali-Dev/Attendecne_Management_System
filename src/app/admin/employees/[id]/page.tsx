@@ -8,6 +8,7 @@ import { DeviceMappingForm } from "./DeviceMappingForm";
 import { ShiftEditForm } from "./ShiftEditForm";
 import { OffDaysEditForm } from "./OffDaysEditForm";
 import { DisableEmployeeControl } from "./DisableEmployeeControl";
+import { SupportAgentToggle } from "./SupportAgentToggle";
 import { AttendanceEditor } from "./AttendanceEditor";
 import { SalarySlipEditor } from "./SalarySlipEditor";
 import { EmployeeLeaveHistory } from "./EmployeeLeaveHistory";
@@ -26,7 +27,17 @@ import {
   shiftLengthHours,
   shiftMonthKey,
 } from "@/lib/format";
-import type { AppActivity, Attendance, LeaveRequest, Profile, ProductivitySession, SalarySlip } from "@/lib/types";
+import { fetchAll } from "@/lib/fetchAll";
+import { EmployeeTickets } from "./EmployeeTickets";
+import type {
+  AppActivity,
+  Attendance,
+  LeaveRequest,
+  Profile,
+  ProductivitySession,
+  SalarySlip,
+  TicketReport,
+} from "@/lib/types";
 import {
   ArrowLeft,
   IdCard,
@@ -81,6 +92,7 @@ export default async function EmployeeDetail({
     { data: hoursAttData },
     { data: sessionsData },
     { data: appsData },
+    ticketRows,
   ] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", params.id).single(),
     supabase
@@ -122,6 +134,17 @@ export default async function EmployeeDetail({
       .eq("user_id", params.id)
       .gte("work_date", hoursMonthStart)
       .lte("work_date", hoursMonthEnd),
+    // Every ticket row for this employee, so the Tickets section can show the
+    // selected month day-by-day AND a running all-time total from one read.
+    fetchAll<TicketReport>((from, to) =>
+      supabase
+        .from("ticket_reports")
+        .select("*")
+        .eq("user_id", params.id)
+        .order("work_date", { ascending: false })
+        .order("id")
+        .range(from, to)
+    ),
   ]);
 
   if (!profileData) notFound();
@@ -131,6 +154,7 @@ export default async function EmployeeDetail({
     ...profileData,
     off_days: profileData.off_days ?? [0, 6],
     disabled_at: profileData.disabled_at ?? null,
+    is_support: profileData.is_support ?? false,
   } as Profile;
   const slips = (slipData ?? []) as SalarySlip[];
   const attendanceForSalary = (salaryAttData ?? []) as Attendance[];
@@ -168,6 +192,13 @@ export default async function EmployeeDetail({
   const monthProductivityPct = productivityPercent(monthProductiveSeconds, monthUnproductiveSeconds);
   const productivityTargetHours = requiredProductiveHours(shiftHours);
   const productivityRequiredHours = (workingDaysTotal - leaveDaysTotal) * productivityTargetHours;
+
+  // Tickets this employee logged (only meaningful for support agents — the
+  // section below is hidden otherwise). Month slice for the day-by-day view,
+  // whole history for the all-time total.
+  const monthTicketRows = ticketRows.filter((r) => r.work_date.slice(0, 7) === monthKey);
+  const ticketsThisMonth = monthTicketRows.reduce((sum, r) => sum + r.tickets_solved, 0);
+  const ticketsAllTime = ticketRows.reduce((sum, r) => sum + r.tickets_solved, 0);
 
   const monthLabel = formatMonthLabel(monthKey);
   const prevMonthKey = shiftMonthKey(monthKey, -1);
@@ -299,6 +330,15 @@ export default async function EmployeeDetail({
         />
       </div>
 
+      {emp.is_support && (
+        <EmployeeTickets
+          monthLabel={monthLabel}
+          monthEntries={monthTicketRows}
+          ticketsThisMonth={ticketsThisMonth}
+          ticketsAllTime={ticketsAllTime}
+        />
+      )}
+
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Profile */}
         <div className="card p-6 lg:col-span-1">
@@ -331,6 +371,9 @@ export default async function EmployeeDetail({
           <ShiftEditForm employeeId={emp.id} initialStart={emp.shift_start} initialEnd={emp.shift_end} />
           <OffDaysEditForm employeeId={emp.id} initialOffDays={emp.off_days} />
           <DeviceMappingForm employeeId={emp.id} initialValue={emp.device_user_id} />
+          {emp.role !== "ADMIN" && (
+            <SupportAgentToggle employeeId={emp.id} initialIsSupport={emp.is_support} />
+          )}
           {emp.role !== "ADMIN" && (
             <DisableEmployeeControl
               employeeId={emp.id}

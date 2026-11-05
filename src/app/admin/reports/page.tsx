@@ -183,7 +183,7 @@ export default async function AdminReportsPage({
       ) : (
         <div className="card overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1150px] text-sm">
+            <table className="w-full min-w-[1280px] text-sm">
               <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-400">
                 <tr>
                   <th className="sticky left-0 z-10 min-w-[13rem] bg-slate-50 px-6 py-3 text-left font-medium">
@@ -233,9 +233,10 @@ export default async function AdminReportsPage({
       )}
 
       <p className="text-center text-xs text-slate-400">
-        Required days and hours exclude rest days and approved leave. Extra days
-        are rest days the employee worked. Total days worked = Present days +
-        Extra days. Click an employee for their full month.
+        Rest days are excluded throughout. Required days are the month&apos;s working days (approved leave
+        included); Required hours exclude approved leave so time off doesn&apos;t lower attendance. Extra days
+        are rest days the employee worked. Total days worked = Present + Extra days. Paid working days =
+        Present + Extra days + Leaves. Click an employee for their full month.
       </p>
     </div>
   );

@@ -34,6 +34,10 @@ create table if not exists public.profiles (
   -- disabled 15 Oct still counts for all of October and every earlier month,
   -- but not November or later. Re-enabling clears this back to NULL.
   disabled_at     date,
+  -- Whether this employee is a customer-support agent. Admin-set, not chosen
+  -- at registration. Only support agents get the daily ticket-log screen and
+  -- appear in the admin ticket report.
+  is_support      boolean     not null default false,
   created_at      timestamptz not null default now()
 );
 
@@ -49,6 +53,8 @@ alter table public.profiles add column if not exists off_days integer[] not null
 -- Profiles created before the "disable instead of delete" feature existed are
 -- active (NULL) until an admin disables them.
 alter table public.profiles add column if not exists disabled_at date;
+-- Customer-support flag, off by default — an admin turns it on per employee.
+alter table public.profiles add column if not exists is_support boolean not null default false;
 
 -- ---------------------------------------------------------------------------
 -- 2. ATTENDANCE  (one row per employee per day)
@@ -166,6 +172,25 @@ create table if not exists public.password_reset_codes (
 create index if not exists password_reset_codes_user_idx on public.password_reset_codes (user_id);
 
 -- ---------------------------------------------------------------------------
+-- 2g. TICKET REPORTS  (one row per support agent per day — how many customer
+-- support tickets they resolved that day. Logged by the agent, correctable by
+-- an admin, the same way attendance is.)
+-- ---------------------------------------------------------------------------
+create table if not exists public.ticket_reports (
+  id             uuid primary key default gen_random_uuid(),
+  user_id        uuid not null references public.profiles (id) on delete cascade,
+  work_date      date not null default (now() at time zone 'utc')::date,
+  tickets_solved integer not null default 0 check (tickets_solved >= 0),
+  note           text,
+  created_at     timestamptz not null default now(),
+  updated_at     timestamptz not null default now(),
+  unique (user_id, work_date)
+);
+
+create index if not exists ticket_reports_user_idx on public.ticket_reports (user_id);
+create index if not exists ticket_reports_date_idx on public.ticket_reports (work_date);
+
+-- ---------------------------------------------------------------------------
 -- 3. is_admin()  — SECURITY DEFINER avoids RLS recursion on profiles
 -- ---------------------------------------------------------------------------
 create or replace function public.is_admin()
@@ -190,6 +215,7 @@ alter table public.leave_requests enable row level security;
 alter table public.notifications enable row level security;
 alter table public.complaints enable row level security;
 alter table public.password_reset_codes enable row level security;
+alter table public.ticket_reports enable row level security;
 
 -- profiles -------------------------------------------------------------------
 drop policy if exists "read own or admin reads all" on public.profiles;
@@ -287,6 +313,33 @@ create policy "insert own complaint" on public.complaints
 drop policy if exists "admin resolves any complaint" on public.complaints;
 create policy "admin resolves any complaint" on public.complaints
   for update using (public.is_admin()) with check (public.is_admin());
+
+-- ticket reports --------------------------------------------------------------
+-- A support agent logs and corrects their own daily counts; an admin can read
+-- everyone's and fix any of them. Mirrors the attendance policy set.
+drop policy if exists "read own tickets or admin reads all" on public.ticket_reports;
+create policy "read own tickets or admin reads all" on public.ticket_reports
+  for select using (user_id = auth.uid() or public.is_admin());
+
+drop policy if exists "insert own tickets" on public.ticket_reports;
+create policy "insert own tickets" on public.ticket_reports
+  for insert with check (user_id = auth.uid());
+
+drop policy if exists "update own tickets" on public.ticket_reports;
+create policy "update own tickets" on public.ticket_reports
+  for update using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+drop policy if exists "admin inserts any tickets" on public.ticket_reports;
+create policy "admin inserts any tickets" on public.ticket_reports
+  for insert with check (public.is_admin());
+
+drop policy if exists "admin updates any tickets" on public.ticket_reports;
+create policy "admin updates any tickets" on public.ticket_reports
+  for update using (public.is_admin()) with check (public.is_admin());
+
+drop policy if exists "admin deletes any tickets" on public.ticket_reports;
+create policy "admin deletes any tickets" on public.ticket_reports
+  for delete using (public.is_admin());
 
 -- password reset codes --------------------------------------------------------
 -- No public policies at all: a forgot-password request happens before the
