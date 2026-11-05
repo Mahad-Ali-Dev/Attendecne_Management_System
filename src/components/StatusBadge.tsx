@@ -1,6 +1,6 @@
 import type { AttendanceStatus } from "@/lib/types";
 
-type ExtendedStatus = AttendanceStatus | "NOT_IN" | "ON_LEAVE" | "REST_DAY";
+export type ExtendedStatus = AttendanceStatus | "NOT_IN" | "ON_LEAVE" | "REST_DAY";
 
 const MAP: Record<ExtendedStatus, { label: string; cls: string }> = {
   PRESENT: { label: "Present", cls: "bg-emerald-50 text-emerald-700" },

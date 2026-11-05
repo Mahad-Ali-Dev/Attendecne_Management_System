@@ -4,7 +4,7 @@ import { getCurrentProfile } from "@/lib/data";
 import { createClient } from "@/lib/supabase/server";
 import { Avatar } from "@/components/Avatar";
 import { StatCard } from "@/components/StatCard";
-import { StatusBadge } from "@/components/StatusBadge";
+import { StatusBadge, type ExtendedStatus } from "@/components/StatusBadge";
 import { fetchAll } from "@/lib/fetchAll";
 import { leaveDatesSet } from "@/lib/payroll";
 import { buildReportRow } from "@/lib/report";
@@ -88,7 +88,7 @@ export default async function TeamPage({ searchParams }: { searchParams: { month
     const todayRec = todayByUser.get(m.id);
     const onLeaveToday = leaveDates.has(todayKey);
     const restToday = !isWorkingDay(new Date(`${todayKey}T00:00:00Z`), m.off_days);
-    const todayStatus = onLeaveToday
+    const todayStatus: ExtendedStatus = onLeaveToday
       ? "ON_LEAVE"
       : todayRec?.check_in
         ? todayRec.status
