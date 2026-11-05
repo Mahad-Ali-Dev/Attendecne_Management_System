@@ -2,7 +2,6 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Avatar } from "@/components/Avatar";
-import { StatCard } from "@/components/StatCard";
 import { MonthlyHoursChart } from "@/components/MonthlyHoursChart";
 import { DeviceMappingForm } from "./DeviceMappingForm";
 import { ShiftEditForm } from "./ShiftEditForm";
@@ -13,9 +12,13 @@ import { AttendanceEditor } from "./AttendanceEditor";
 import { SalarySlipEditor } from "./SalarySlipEditor";
 import { EmployeeLeaveHistory } from "./EmployeeLeaveHistory";
 import { EmployeeProductivity } from "./EmployeeProductivity";
+import { EmployeeTickets } from "./EmployeeTickets";
+import { HoursSection } from "./HoursSection";
 import { buildAttendanceHistory, buildMonthDayHours } from "@/lib/hours";
 import { leaveDatesSet } from "@/lib/payroll";
-import { productivityPercent, requiredProductiveHours } from "@/lib/productivity";
+import { requiredProductiveHours } from "@/lib/productivity";
+import { buildReportRow, REPORT_COLUMNS } from "@/lib/report";
+import { fetchAll } from "@/lib/fetchAll";
 import {
   formatDate,
   formatHours,
@@ -27,8 +30,6 @@ import {
   shiftLengthHours,
   shiftMonthKey,
 } from "@/lib/format";
-import { fetchAll } from "@/lib/fetchAll";
-import { EmployeeTickets } from "./EmployeeTickets";
 import type {
   AppActivity,
   Attendance,
@@ -47,17 +48,25 @@ import {
   Mail,
   Briefcase,
   Clock,
-  CalendarCheck,
   CalendarOff,
-  Target,
-  TrendingUp,
-  TrendingDown,
-  Percent,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
 
 export const dynamic = "force-dynamic";
+
+// The monthly-report figures, grouped so the card reads top to bottom: the
+// day counts a by-the-day payroll needs first, then the hours view, then the
+// tracker view. Labels and values come straight from REPORT_COLUMNS, so this
+// card always shows exactly what the Reports tab does.
+const REPORT_GROUPS: { title: string; keys: string[] }[] = [
+  {
+    title: "Days",
+    keys: ["requiredDays", "presentDays", "absentDays", "leaves", "extraDays", "daysWorked", "paidWorkingDays"],
+  },
+  { title: "Hours", keys: ["requiredHours", "completedHours", "attendancePct"] },
+  { title: "Tracking", keys: ["requiredTracking", "completedTracking", "trackingPct"] },
+];
 
 export default async function EmployeeDetail({
   params,
@@ -181,15 +190,14 @@ export default async function EmployeeDetail({
     historyEnd
   );
 
+  // The exact same month-row the Reports tab builds for this employee, so the
+  // summary card below matches the Reports table figure-for-figure.
+  const reportRow = buildReportRow(emp, monthKey, todayKey, hoursAttendance, approvedLeaveDates, productivitySessions);
+  const columnsByKey = new Map(REPORT_COLUMNS.map((c) => [c.key, c] as const));
+
   const workingDaysTotal = hoursDays.filter((d) => !d.isRestDay).length;
   const leaveDaysTotal = hoursDays.filter((d) => d.status === "ON_LEAVE").length;
-  const expectedHours = (workingDaysTotal - leaveDaysTotal) * shiftHours;
-  const completedHours = hoursDays.reduce((sum, d) => sum + d.hours, 0);
-  const completionPct = expectedHours > 0 ? Math.round((completedHours / expectedHours) * 100) : 0;
 
-  const monthProductiveSeconds = productivitySessions.reduce((sum, s) => sum + s.total_productive_seconds, 0);
-  const monthUnproductiveSeconds = productivitySessions.reduce((sum, s) => sum + s.total_unproductive_seconds, 0);
-  const monthProductivityPct = productivityPercent(monthProductiveSeconds, monthUnproductiveSeconds);
   const productivityTargetHours = requiredProductiveHours(shiftHours);
   const productivityRequiredHours = (workingDaysTotal - leaveDaysTotal) * productivityTargetHours;
 
@@ -204,6 +212,7 @@ export default async function EmployeeDetail({
   const prevMonthKey = shiftMonthKey(monthKey, -1);
   const nextMonthKey = shiftMonthKey(monthKey, 1);
   const nextDisabled = nextMonthKey > currentMonthKey;
+  const isAdmin = emp.role === "ADMIN";
 
   return (
     <div className="space-y-6">
@@ -221,183 +230,178 @@ export default async function EmployeeDetail({
             This account was <span className="font-semibold">disabled</span> on {formatDate(emp.disabled_at)}. The
             employee can&apos;t sign in, and they&apos;re excluded from attendance and stats from{" "}
             {formatMonthLabel(shiftMonthKey(emp.disabled_at.slice(0, 7), 1))} onward. All of their past records are
-            kept. Re-enable from the profile panel below.
+            kept. Re-enable from the settings panel at the bottom.
           </span>
         </div>
       )}
 
-      {/* Monthly hours */}
-      <div className="space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-semibold text-navy">Monthly hours</h2>
-            <p className="mt-1 text-sm text-slate-500">
-              Tracked against their {formatHours(shiftHours)} shift ({emp.shift_start.slice(0, 5)}–
-              {emp.shift_end.slice(0, 5)}), off {formatOffDays(emp.off_days)}.
+      {/* 1 — Who this is */}
+      <div className="card p-6">
+        <div className="flex flex-wrap items-start gap-4">
+          <Avatar name={emp.full_name} src={emp.avatar_url} size={72} />
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-xl font-bold text-navy">{emp.full_name}</h1>
+              {isAdmin && <span className="badge bg-brand-50 text-brand-700">Administrator</span>}
+              {emp.is_support && <span className="badge bg-sky-50 text-sky-700">Support agent</span>}
+              {emp.disabled_at && <span className="badge bg-amber-50 text-amber-700">Disabled</span>}
+            </div>
+            <p className="mt-0.5 text-sm text-slate-500">
+              {emp.position || "Employee"}
+              {emp.department ? ` · ${emp.department}` : ""}
             </p>
           </div>
-          <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white p-1">
+          <div className="text-right text-xs text-slate-400">Joined {formatDate(emp.created_at)}</div>
+        </div>
+        <dl className="mt-5 grid grid-cols-1 gap-x-8 gap-y-4 border-t border-slate-50 pt-5 text-sm sm:grid-cols-2 lg:grid-cols-3">
+          <Row icon={<Mail className="h-4 w-4" />} label="Email" value={emp.email} />
+          <Row icon={<Phone className="h-4 w-4" />} label="Phone" value={emp.phone} />
+          <Row icon={<IdCard className="h-4 w-4" />} label="CNIC" value={emp.cnic} />
+          <Row icon={<Building2 className="h-4 w-4" />} label="Department" value={emp.department} />
+          <Row icon={<Briefcase className="h-4 w-4" />} label="Position" value={emp.position} />
+          <Row
+            icon={<Clock className="h-4 w-4" />}
+            label="Shift"
+            value={`${formatTimeOfDay(emp.shift_start)} – ${formatTimeOfDay(emp.shift_end)}`}
+          />
+          <Row icon={<CalendarOff className="h-4 w-4" />} label="Rest days" value={formatOffDays(emp.off_days)} />
+          <Row icon={<MapPin className="h-4 w-4" />} label="Address" value={emp.address} />
+        </dl>
+      </div>
+
+      {/* 2 — Month toolbar (one selector drives the whole page) */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold text-navy">Monthly report</h2>
+          <p className="mt-1 text-sm text-slate-500">
+            {monthLabel} · {formatHours(shiftHours)} shift ({emp.shift_start.slice(0, 5)}–{emp.shift_end.slice(0, 5)}),
+            off {formatOffDays(emp.off_days)}.
+          </p>
+        </div>
+        <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white p-1">
+          <Link
+            href={`/admin/employees/${emp.id}?month=${prevMonthKey}`}
+            aria-label="Previous month"
+            className="flex h-8 w-8 items-center justify-center rounded-md text-slate-500 transition hover:bg-slate-100 hover:text-navy"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Link>
+          <span className="min-w-[9rem] text-center text-sm font-semibold text-navy">{monthLabel}</span>
+          {nextDisabled ? (
+            <span className="flex h-8 w-8 items-center justify-center text-slate-200">
+              <ChevronRight className="h-4 w-4" />
+            </span>
+          ) : (
             <Link
-              href={`/admin/employees/${emp.id}?month=${prevMonthKey}`}
+              href={`/admin/employees/${emp.id}?month=${nextMonthKey}`}
+              aria-label="Next month"
               className="flex h-8 w-8 items-center justify-center rounded-md text-slate-500 transition hover:bg-slate-100 hover:text-navy"
             >
-              <ChevronLeft className="h-4 w-4" />
+              <ChevronRight className="h-4 w-4" />
             </Link>
-            <span className="min-w-[9rem] text-center text-sm font-semibold text-navy">{monthLabel}</span>
-            {nextDisabled ? (
-              <span className="flex h-8 w-8 items-center justify-center text-slate-200">
-                <ChevronRight className="h-4 w-4" />
-              </span>
+          )}
+        </div>
+      </div>
+
+      {/* 3 — The report, laid out as readable tiles (same figures as the Reports tab) */}
+      <div className="card space-y-5 p-6">
+        <div>
+          <h3 className="font-semibold text-navy">This month at a glance</h3>
+          <p className="text-xs text-slate-400">
+            The same figures as the Reports tab. Highlighted tiles are the headline payroll numbers.
+          </p>
+        </div>
+        {REPORT_GROUPS.map((group) => (
+          <div key={group.title}>
+            <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">{group.title}</h4>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+              {group.keys.map((key) => {
+                const col = columnsByKey.get(key);
+                if (!col) return null;
+                return (
+                  <div
+                    key={key}
+                    className={`rounded-xl border p-3 ${
+                      col.strong ? "border-brand-100 bg-brand-50/60" : "border-slate-100 bg-slate-50/60"
+                    }`}
+                  >
+                    <div className="text-[11px] font-medium uppercase tracking-wide text-slate-400">{col.label}</div>
+                    <div className={`mt-1 text-lg font-bold ${col.strong ? "text-brand-700" : "text-navy"}`}>
+                      {col.value(reportRow)}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* 4 — Daily hours: graph by default, full attendance table one tab away */}
+      <HoursSection
+        subtitle={`Hours worked each day against the ${formatHours(
+          shiftHours
+        )} target. Switch to the table for the full day-by-day attendance.`}
+        chart={
+          <div className="card p-6">
+            {hoursDays.length === 0 ? (
+              <p className="py-10 text-center text-sm text-slate-400">No working days in this month.</p>
             ) : (
-              <Link
-                href={`/admin/employees/${emp.id}?month=${nextMonthKey}`}
-                className="flex h-8 w-8 items-center justify-center rounded-md text-slate-500 transition hover:bg-slate-100 hover:text-navy"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Link>
+              <MonthlyHoursChart data={hoursDays} targetHours={shiftHours} />
             )}
           </div>
-        </div>
+        }
+        table={<AttendanceEditor employeeId={emp.id} entries={attendanceHistory} monthLabel={monthLabel} />}
+      />
 
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          <StatCard icon={<CalendarCheck className="h-5 w-5" />} label="Working days" value={workingDaysTotal} />
-          {leaveDaysTotal > 0 && (
-            <StatCard
-              icon={<CalendarOff className="h-5 w-5" />}
-              label="On leave"
-              value={leaveDaysTotal}
-              accent="text-brand-600"
-            />
-          )}
-          <StatCard icon={<Target className="h-5 w-5" />} label="Expected hours" value={formatHours(expectedHours)} />
-          <StatCard
-            icon={<Clock className="h-5 w-5" />}
-            label="Hours completed"
-            value={formatHours(completedHours)}
-            accent="text-brand-600"
-          />
-          <StatCard
-            icon={<TrendingUp className="h-5 w-5" />}
-            label="Completion"
-            value={`${completionPct}%`}
-            accent="text-brand-600"
-          />
-        </div>
+      {/* 5 — Productivity (tracker): its own graph/table tabs live inside */}
+      <EmployeeProductivity
+        employeeId={emp.id}
+        sessions={productivitySessions}
+        apps={productivityApps}
+        monthStart={hoursMonthStart}
+        monthEnd={historyEnd}
+        requiredHours={productivityRequiredHours}
+      />
 
-        <div className="card p-6">
-          {hoursDays.length === 0 ? (
-            <p className="py-10 text-center text-sm text-slate-400">No working days in this month.</p>
-          ) : (
-            <MonthlyHoursChart data={hoursDays} targetHours={shiftHours} />
-          )}
-        </div>
-      </div>
-
-      <div className="space-y-4">
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          <StatCard
-            icon={<Clock className="h-5 w-5" />}
-            label="Total tracked this month"
-            value={formatHours((monthProductiveSeconds + monthUnproductiveSeconds) / 3600)}
-          />
-          <StatCard
-            icon={<TrendingUp className="h-5 w-5" />}
-            label="Productive this month"
-            value={formatHours(monthProductiveSeconds / 3600)}
-            accent="text-emerald-600"
-          />
-          <StatCard
-            icon={<TrendingDown className="h-5 w-5" />}
-            label="Unproductive this month"
-            value={formatHours(monthUnproductiveSeconds / 3600)}
-            accent="text-amber-600"
-          />
-          <StatCard
-            icon={<Percent className="h-5 w-5" />}
-            label="Productivity this month"
-            value={monthProductivityPct === null ? "—" : `${monthProductivityPct}%`}
-            accent="text-brand-600"
-          />
-        </div>
-
-        <EmployeeProductivity
-          employeeId={emp.id}
-          sessions={productivitySessions}
-          apps={productivityApps}
-          monthStart={hoursMonthStart}
-          monthEnd={historyEnd}
-          requiredHours={productivityRequiredHours}
-        />
-      </div>
-
+      {/* 6 — Support tickets (support agents only) */}
       {emp.is_support && (
         <EmployeeTickets
           monthLabel={monthLabel}
+          monthStart={hoursMonthStart}
+          monthEnd={historyEnd}
           monthEntries={monthTicketRows}
           ticketsThisMonth={ticketsThisMonth}
           ticketsAllTime={ticketsAllTime}
         />
       )}
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Profile */}
-        <div className="card p-6 lg:col-span-1">
-          <div className="flex flex-col items-center text-center">
-            <Avatar name={emp.full_name} src={emp.avatar_url} size={96} />
-            <h1 className="mt-4 text-xl font-bold text-navy">{emp.full_name}</h1>
-            <p className="text-sm text-slate-400">{emp.position || "Employee"}</p>
-            {emp.role === "ADMIN" && (
-              <span className="badge mt-2 bg-brand-50 text-brand-700">Administrator</span>
-            )}
-            {emp.disabled_at && (
-              <span className="badge mt-2 bg-amber-50 text-amber-700">Disabled</span>
-            )}
-          </div>
-          <dl className="mt-6 space-y-3.5 text-sm">
-            <Row icon={<Mail className="h-4 w-4" />} label="Email" value={emp.email} />
-            <Row icon={<IdCard className="h-4 w-4" />} label="CNIC" value={emp.cnic} />
-            <Row icon={<Phone className="h-4 w-4" />} label="Phone" value={emp.phone} />
-            <Row icon={<Building2 className="h-4 w-4" />} label="Department" value={emp.department} />
-            <Row icon={<Briefcase className="h-4 w-4" />} label="Position" value={emp.position} />
-            <Row
-              icon={<Clock className="h-4 w-4" />}
-              label="Shift"
-              value={`${formatTimeOfDay(emp.shift_start)} – ${formatTimeOfDay(emp.shift_end)}`}
-            />
-            <Row icon={<CalendarOff className="h-4 w-4" />} label="Rest days" value={formatOffDays(emp.off_days)} />
-            <Row icon={<MapPin className="h-4 w-4" />} label="Address" value={emp.address} />
-          </dl>
+      {/* 7 — Records (full width, each its own card) */}
+      <SalarySlipEditor
+        employeeId={emp.id}
+        slips={slips}
+        attendance={attendanceForSalary}
+        leaveRequests={leaveRequests}
+        shiftStart={emp.shift_start}
+        shiftEnd={emp.shift_end}
+        offDays={emp.off_days}
+      />
+      <EmployeeLeaveHistory requests={leaveRequests} />
 
+      {/* 8 — Admin settings, kept at the bottom and out of the way */}
+      <div className="card p-6">
+        <h3 className="font-semibold text-navy">Employee settings</h3>
+        <p className="text-xs text-slate-400">Shift, rest days, device mapping and account access.</p>
+        {/* Two columns on wider screens so the controls don't make a tall column. */}
+        <div className="grid grid-cols-1 gap-x-8 lg:grid-cols-2">
           <ShiftEditForm employeeId={emp.id} initialStart={emp.shift_start} initialEnd={emp.shift_end} />
           <OffDaysEditForm employeeId={emp.id} initialOffDays={emp.off_days} />
           <DeviceMappingForm employeeId={emp.id} initialValue={emp.device_user_id} />
-          {emp.role !== "ADMIN" && (
-            <SupportAgentToggle employeeId={emp.id} initialIsSupport={emp.is_support} />
+          {!isAdmin && <SupportAgentToggle employeeId={emp.id} initialIsSupport={emp.is_support} />}
+          {!isAdmin && (
+            <DisableEmployeeControl employeeId={emp.id} employeeName={emp.full_name} disabledAt={emp.disabled_at} />
           )}
-          {emp.role !== "ADMIN" && (
-            <DisableEmployeeControl
-              employeeId={emp.id}
-              employeeName={emp.full_name}
-              disabledAt={emp.disabled_at}
-            />
-          )}
-
-          <p className="mt-4 border-t border-slate-50 pt-4 text-xs text-slate-400">
-            Registered {formatDate(emp.created_at)}
-          </p>
         </div>
-
-        <AttendanceEditor employeeId={emp.id} entries={attendanceHistory} monthLabel={monthLabel} />
-        <SalarySlipEditor
-          employeeId={emp.id}
-          slips={slips}
-          attendance={attendanceForSalary}
-          leaveRequests={leaveRequests}
-          shiftStart={emp.shift_start}
-          shiftEnd={emp.shift_end}
-          offDays={emp.off_days}
-        />
-        <EmployeeLeaveHistory requests={leaveRequests} />
       </div>
     </div>
   );

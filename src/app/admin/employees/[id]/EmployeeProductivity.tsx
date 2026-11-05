@@ -45,6 +45,8 @@ export function EmployeeProductivity({
   const [deleting, startDeleteTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  // Graph by default; the tab in the header swaps in the full day-by-day table.
+  const [view, setView] = useState<"chart" | "table">("chart");
   const appsForViewing = viewingDate ? apps.filter((a) => a.work_date === viewingDate) : [];
   const trackedHours = sessions.reduce((sum, s) => sum + s.total_productive_seconds, 0) / 3600;
   const completionPct = requiredHours > 0 ? Math.round((trackedHours / requiredHours) * 100) : 0;
@@ -150,17 +152,39 @@ export function EmployeeProductivity({
 
   return (
     <div className="card overflow-hidden">
-      <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-6 py-4">
         <div>
           <h2 className="font-semibold text-navy">Productivity</h2>
           <p className="text-xs text-slate-400">App activity tracked for the month selected above.</p>
         </div>
-        <button
-          onClick={openAdd}
-          className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-brand-600 transition hover:bg-brand-50"
-        >
-          <Plus className="h-3.5 w-3.5" /> Add time
-        </button>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white p-1">
+            <button
+              type="button"
+              onClick={() => setView("chart")}
+              className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${
+                view === "chart" ? "bg-brand-50 text-brand-700" : "text-slate-500 hover:text-navy"
+              }`}
+            >
+              Graph
+            </button>
+            <button
+              type="button"
+              onClick={() => setView("table")}
+              className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${
+                view === "table" ? "bg-brand-50 text-brand-700" : "text-slate-500 hover:text-navy"
+              }`}
+            >
+              Table
+            </button>
+          </div>
+          <button
+            onClick={openAdd}
+            className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-brand-600 transition hover:bg-brand-50"
+          >
+            <Plus className="h-3.5 w-3.5" /> Add time
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 border-b border-slate-100 p-6 sm:grid-cols-3">
@@ -179,16 +203,21 @@ export function EmployeeProductivity({
         />
       </div>
 
-      {chartData.length > 0 && (
-        <div className="border-b border-slate-100 p-6">
-          <ProductivityChart data={chartData} />
+      {view === "chart" && (
+        <div className="p-6">
+          {chartData.length > 0 ? (
+            <ProductivityChart data={chartData} />
+          ) : (
+            <p className="py-10 text-center text-sm text-slate-400">No activity tracked this month.</p>
+          )}
         </div>
       )}
 
-      {sessions.length === 0 ? (
-        <p className="px-6 py-10 text-center text-sm text-slate-400">No activity tracked this month.</p>
-      ) : (
-        <table className="w-full text-sm">
+      {view === "table" &&
+        (sessions.length === 0 ? (
+          <p className="px-6 py-10 text-center text-sm text-slate-400">No activity tracked this month.</p>
+        ) : (
+          <table className="w-full text-sm">
           <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-400">
             <tr>
               <th className="px-6 py-3 font-medium">Date</th>
@@ -255,7 +284,7 @@ export function EmployeeProductivity({
             })}
           </tbody>
         </table>
-      )}
+        ))}
 
       {viewingDate && (
         <AppBreakdownModal
