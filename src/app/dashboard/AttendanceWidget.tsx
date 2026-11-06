@@ -7,20 +7,30 @@ import { LogIn, LogOut, Loader2, Clock } from "lucide-react";
 import { formatTime } from "@/lib/format";
 import type { Attendance } from "@/lib/types";
 
-export function AttendanceWidget({ today }: { today: Attendance | null }) {
+export function AttendanceWidget({
+  today,
+  blockCheckout = false,
+}: {
+  today: Attendance | null;
+  /** True for a support agent who's checked in but hasn't logged today's tickets. */
+  blockCheckout?: boolean;
+}) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [busy, setBusy] = useState<"in" | "out" | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const hasCheckedIn = !!today?.check_in;
   const hasCheckedOut = !!today?.check_out;
 
   function run(action: "in" | "out") {
     setBusy(action);
+    setError(null);
     startTransition(async () => {
       const res = action === "in" ? await checkIn() : await checkOut();
       setBusy(null);
-      if (!("error" in res)) router.refresh();
+      if ("error" in res) setError(res.error);
+      else router.refresh();
     });
   }
 
@@ -65,7 +75,7 @@ export function AttendanceWidget({ today }: { today: Attendance | null }) {
         </button>
         <button
           onClick={() => run("out")}
-          disabled={!hasCheckedIn || hasCheckedOut || pending}
+          disabled={!hasCheckedIn || hasCheckedOut || pending || blockCheckout}
           className="btn-dark flex-1"
         >
           {busy === "out" ? (
@@ -77,6 +87,12 @@ export function AttendanceWidget({ today }: { today: Attendance | null }) {
         </button>
       </div>
 
+      {blockCheckout && !hasCheckedOut && (
+        <p className="mt-3 text-center text-sm text-amber-600">
+          Log today&apos;s tickets below before you can check out.
+        </p>
+      )}
+      {error && <p className="mt-2 text-center text-sm text-red-600">{error}</p>}
       {hasCheckedOut && (
         <p className="mt-3 text-center text-sm text-emerald-600">
           ✓ Your attendance for today is complete. Have a great evening!

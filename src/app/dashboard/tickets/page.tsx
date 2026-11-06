@@ -39,9 +39,7 @@ export default async function TicketsPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-navy">Tickets</h1>
-        <p className="mt-1 text-sm text-slate-500">
-          Log how many support tickets you solve each day — once per day, and it&apos;s final.
-        </p>
+        <p className="mt-1 text-sm text-slate-500">Your daily ticket counts. Record today&apos;s from your dashboard.</p>
       </div>
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
@@ -50,7 +48,7 @@ export default async function TicketsPage() {
         <StatCard icon={<Sigma className="h-5 w-5" />} label="All time" value={allTimeTotal} />
       </div>
 
-      <TicketLogForm todayKey={todayKey} entries={entries} />
+      <TicketLogForm entries={entries} />
     </div>
   );
 }

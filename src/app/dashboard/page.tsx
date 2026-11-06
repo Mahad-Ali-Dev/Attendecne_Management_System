@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/data";
 import { AttendanceWidget } from "./AttendanceWidget";
+import { DashboardTicketLog } from "./DashboardTicketLog";
 import { EditProfileButton } from "./EditProfileButton";
 import { ChangePasswordButton } from "./ChangePasswordButton";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -53,6 +54,22 @@ export default async function DashboardPage() {
     today
   );
 
+  // Support agents log the day's tickets before they can check out — the gate
+  // is scoped to the open shift's work day (handles overnight shifts).
+  const ticketDate = todayRecord?.work_date ?? today;
+  let todayTickets: number | null = null;
+  if (profile.is_support) {
+    const { data: tr } = await supabase
+      .from("ticket_reports")
+      .select("tickets_solved")
+      .eq("user_id", profile.id)
+      .eq("work_date", ticketDate)
+      .maybeSingle();
+    todayTickets = tr ? (tr.tickets_solved as number) : null;
+  }
+  const blockCheckout =
+    profile.is_support && !!todayRecord?.check_in && !todayRecord?.check_out && todayTickets === null;
+
   return (
     <div className="space-y-8">
       <div>
@@ -63,8 +80,15 @@ export default async function DashboardPage() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2">
-          <AttendanceWidget today={todayRecord} />
+        <div className="space-y-6 lg:col-span-2">
+          <AttendanceWidget today={todayRecord} blockCheckout={blockCheckout} />
+          {profile.is_support && (
+            <DashboardTicketLog
+              workDate={ticketDate}
+              loggedCount={todayTickets}
+              hasCheckedIn={!!todayRecord?.check_in}
+            />
+          )}
         </div>
 
         {/* Profile card */}

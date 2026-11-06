@@ -139,7 +139,7 @@ export async function checkOut() {
   // nothing.
   const { data: openRecord, error: findErr } = await supabase
     .from("attendance")
-    .select("id")
+    .select("id, work_date")
     .eq("user_id", user.id)
     .not("check_in", "is", null)
     .is("check_out", null)
@@ -149,6 +149,20 @@ export async function checkOut() {
 
   if (findErr) return { error: findErr.message };
   if (!openRecord) return { error: "You haven't checked in yet." };
+
+  // A customer-support agent must log the day's tickets before closing the
+  // shift, so the ticket report is never skipped. Scoped to the shift's own
+  // work_date so an overnight shift checks the day it started, not "now".
+  const { data: profile } = await supabase.from("profiles").select("is_support").eq("id", user.id).single();
+  if (profile?.is_support) {
+    const { data: ticket } = await supabase
+      .from("ticket_reports")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("work_date", openRecord.work_date)
+      .maybeSingle();
+    if (!ticket) return { error: "Log today's tickets before you check out." };
+  }
 
   const { iso } = nowPKT();
   const { error } = await supabase

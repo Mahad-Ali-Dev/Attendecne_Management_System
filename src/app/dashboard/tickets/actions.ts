@@ -32,6 +32,15 @@ export async function logTickets(workDate: string, ticketsSolved: number) {
   if (!Number.isInteger(ticketsSolved) || ticketsSolved < 0) return { error: "Enter a whole number of tickets." };
   if (ticketsSolved > 10_000) return { error: "That's an unusually large number — please check it." };
 
+  // No tickets without attendance: the day must have a check-in first.
+  const { data: att } = await supabase
+    .from("attendance")
+    .select("check_in")
+    .eq("user_id", user.id)
+    .eq("work_date", workDate)
+    .maybeSingle();
+  if (!att?.check_in) return { error: "Check in before logging your tickets." };
+
   const { error } = await supabase.from("ticket_reports").insert({
     user_id: user.id,
     work_date: workDate,
@@ -48,6 +57,7 @@ export async function logTickets(workDate: string, ticketsSolved: number) {
   }
 
   revalidatePath("/dashboard/tickets");
+  revalidatePath("/dashboard");
   revalidatePath("/admin/tickets");
   return { ok: true };
 }
