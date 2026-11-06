@@ -22,6 +22,8 @@ export default async function AdminProductivityPage({ searchParams }: { searchPa
   const todayKey = pktNow().toISOString().slice(0, 10);
   const requested = searchParams.date && /^\d{4}-\d{2}-\d{2}$/.test(searchParams.date) ? searchParams.date : todayKey;
   const dateKey = requested > todayKey ? todayKey : requested; // no browsing into the future
+  const nowPkt = pktNow();
+  const nowMinutes = nowPkt.getUTCHours() * 60 + nowPkt.getUTCMinutes();
 
   const prevDate = new Date(Date.parse(`${dateKey}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
   const nextDate = new Date(Date.parse(`${dateKey}T00:00:00Z`) + 86_400_000).toISOString().slice(0, 10);
@@ -111,7 +113,14 @@ export default async function AdminProductivityPage({ searchParams }: { searchPa
         />
       </div>
 
-      <ProductivityOverviewTable employees={employees} sessions={sessions} apps={apps} />
+      <ProductivityOverviewTable
+        employees={employees}
+        sessions={sessions}
+        apps={apps}
+        isToday={dateKey === todayKey}
+        nowMinutes={nowMinutes}
+        todayWeekday={nowPkt.getUTCDay()}
+      />
 
       <div className="grid gap-6 lg:grid-cols-2">
         <NeedsCategorization hostnames={needsCategorization} />

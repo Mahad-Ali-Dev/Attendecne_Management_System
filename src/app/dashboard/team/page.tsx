@@ -8,16 +8,21 @@ import { StatusBadge, type ExtendedStatus } from "@/components/StatusBadge";
 import { fetchAll } from "@/lib/fetchAll";
 import { leaveDatesSet } from "@/lib/payroll";
 import { buildReportRow } from "@/lib/report";
+import { productivityPercent } from "@/lib/productivity";
 import {
   formatHours,
   formatMonthLabel,
+  isShiftActive,
   isWorkingDay,
   monthKeyOf,
   pktNow,
   shiftMonthKey,
 } from "@/lib/format";
 import type { Attendance, LeaveRequest, Profile, ProductivitySession, TicketReport } from "@/lib/types";
-import { Users, UserCheck, UserX, CalendarOff, ChevronLeft, ChevronRight } from "lucide-react";
+import { Users, UserCheck, UserX, CalendarOff, AlertTriangle, ChevronLeft, ChevronRight } from "lucide-react";
+
+// A tracked day under this productivity percentage is flagged low.
+const LOW_PRODUCTIVITY_PCT = 50;
 
 export const dynamic = "force-dynamic";
 
@@ -79,11 +84,15 @@ export default async function TeamPage({ searchParams }: { searchParams: { month
   const sessByUser = groupByUser(sessions);
   const ticketByUser = groupByUser(tickets);
   const todayByUser = new Map(todayAtt.map((a) => [a.user_id, a]));
-  const todayWeekday = new Date(`${todayKey}T00:00:00Z`).getUTCDay();
+
+  const nowPkt = pktNow();
+  const nowMinutes = nowPkt.getUTCHours() * 60 + nowPkt.getUTCMinutes();
+  const isCurrentMonth = monthKey === currentMonthKey;
 
   const rows = members.map((m) => {
     const leaveDates = leaveDatesSet(leaveByUser.get(m.id) ?? []);
-    const report = buildReportRow(m, monthKey, todayKey, attByUser.get(m.id) ?? [], leaveDates, sessByUser.get(m.id) ?? []);
+    const memberSessions = sessByUser.get(m.id) ?? [];
+    const report = buildReportRow(m, monthKey, todayKey, attByUser.get(m.id) ?? [], leaveDates, memberSessions);
     const ticketsThisMonth = (ticketByUser.get(m.id) ?? []).reduce((sum, r) => sum + r.tickets_solved, 0);
     const todayRec = todayByUser.get(m.id);
     const onLeaveToday = leaveDates.has(todayKey);
@@ -95,13 +104,30 @@ export default async function TeamPage({ searchParams }: { searchParams: { month
         : restToday
           ? "REST_DAY"
           : "ABSENT";
-    return { member: m, report, ticketsThisMonth, todayStatus };
+    // Tracker off: today, the member should be working — they've checked in, or
+    // their shift is currently running — but nothing has been tracked yet, and
+    // it's not a rest day or approved leave.
+    const trackerOff =
+      isCurrentMonth &&
+      !restToday &&
+      !onLeaveToday &&
+      !memberSessions.some((sn) => sn.work_date === todayKey) &&
+      (!!todayRec?.check_in || isShiftActive(m.shift_start, m.shift_end, nowMinutes));
+    // Low productivity across the month's tracked time.
+    const prodPct = productivityPercent(
+      memberSessions.reduce((sum, x) => sum + x.total_productive_seconds, 0),
+      memberSessions.reduce((sum, x) => sum + x.total_unproductive_seconds, 0)
+    );
+    const lowProductivity = prodPct !== null && prodPct < LOW_PRODUCTIVITY_PCT;
+    return { member: m, report, ticketsThisMonth, todayStatus, trackerOff, lowProductivity };
   });
 
   const presentToday = rows.filter((r) => todayByUser.get(r.member.id)?.check_in).length;
   const onLeaveTodayCount = rows.filter((r) => r.todayStatus === "ON_LEAVE").length;
   const absentTodayCount = rows.filter((r) => r.todayStatus === "ABSENT").length;
   const anySupport = members.some((m) => m.is_support);
+  const trackerOffMembers = rows.filter((r) => r.trackerOff);
+  const lowProductivityMembers = rows.filter((r) => r.lowProductivity);
 
   const monthLabel = formatMonthLabel(monthKey);
   const prevMonthKey = shiftMonthKey(monthKey, -1);
@@ -145,6 +171,27 @@ export default async function TeamPage({ searchParams }: { searchParams: { month
         </div>
       </div>
 
+      {(trackerOffMembers.length > 0 || lowProductivityMembers.length > 0) && (
+        <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-5 py-3.5 text-sm text-amber-900">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+          <div className="space-y-0.5">
+            <span className="font-semibold">Needs attention</span>
+            {trackerOffMembers.length > 0 && (
+              <p>
+                <span className="font-medium text-red-600">Tracker off now</span> ({trackerOffMembers.length}):{" "}
+                {trackerOffMembers.map((r) => r.member.full_name).join(", ")}
+              </p>
+            )}
+            {lowProductivityMembers.length > 0 && (
+              <p>
+                <span className="font-medium text-amber-700">Low productivity</span> ({lowProductivityMembers.length}):{" "}
+                {lowProductivityMembers.map((r) => r.member.full_name).join(", ")}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard icon={<Users className="h-5 w-5" />} label="Team members" value={members.length} />
         <StatCard icon={<UserCheck className="h-5 w-5" />} label="Present today" value={presentToday} accent="text-emerald-600" />
@@ -173,16 +220,25 @@ export default async function TeamPage({ searchParams }: { searchParams: { month
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
-                {rows.map(({ member, report, ticketsThisMonth, todayStatus }) => (
-                  <tr key={member.id} className="text-slate-600">
-                    <td className="sticky left-0 z-10 min-w-[13rem] bg-white px-6 py-3">
+                {rows.map(({ member, report, ticketsThisMonth, todayStatus, trackerOff, lowProductivity }) => {
+                  const tint = trackerOff ? "bg-red-50" : lowProductivity ? "bg-amber-50" : "";
+                  return (
+                  <tr key={member.id} className={`text-slate-600 ${tint}`}>
+                    <td className={`sticky left-0 z-10 min-w-[13rem] px-6 py-3 ${tint || "bg-white"}`}>
                       <Link
                         href={`/dashboard/team/${member.id}?month=${monthKey}`}
                         className="flex items-center gap-3 hover:underline"
                       >
                         <Avatar name={member.full_name} src={member.avatar_url} size={30} />
                         <div className="min-w-0">
-                          <div className="truncate font-medium text-navy">{member.full_name}</div>
+                          <div className="flex items-center gap-2">
+                            <span className="truncate font-medium text-navy">{member.full_name}</span>
+                            {trackerOff ? (
+                              <span className="badge shrink-0 bg-red-100 text-red-700">Tracker off</span>
+                            ) : lowProductivity ? (
+                              <span className="badge shrink-0 bg-amber-100 text-amber-700">Low</span>
+                            ) : null}
+                          </div>
                           <div className="truncate text-xs text-slate-400">
                             {member.position || "Employee"}
                             {member.is_support ? " · Support" : ""}
@@ -205,7 +261,8 @@ export default async function TeamPage({ searchParams }: { searchParams: { month
                       <td className={td}>{member.is_support ? ticketsThisMonth : <span className="text-slate-300">—</span>}</td>
                     )}
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -215,7 +272,8 @@ export default async function TeamPage({ searchParams }: { searchParams: { month
       {members.length > 0 && (
         <p className="text-center text-xs text-slate-400">
           Today&apos;s status is live. Present, Absent, Leave, Hours and Productive are for {monthLabel}; Hours shows
-          worked / expected. Salary isn&apos;t shown here.
+          worked / expected. Amber row = productivity under {LOW_PRODUCTIVITY_PCT}%; red row = tracker off during an
+          active shift. Salary isn&apos;t shown here.
         </p>
       )}
     </div>

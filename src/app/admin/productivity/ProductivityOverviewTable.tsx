@@ -4,17 +4,29 @@ import { useMemo, useState } from "react";
 import { Avatar } from "@/components/Avatar";
 import { AppBreakdownModal } from "@/components/AppBreakdownModal";
 import { formatAppName, productivityPercent } from "@/lib/productivity";
-import { formatHours } from "@/lib/format";
+import { formatHours, isShiftActive } from "@/lib/format";
 import type { AppActivity, Profile, ProductivitySession } from "@/lib/types";
+
+// Below this productivity percentage a tracked day is flagged as low.
+const LOW_PRODUCTIVITY_PCT = 50;
 
 export function ProductivityOverviewTable({
   employees,
   sessions,
   apps,
+  isToday,
+  nowMinutes,
+  todayWeekday,
 }: {
   employees: Profile[];
   sessions: ProductivitySession[];
   apps: AppActivity[];
+  /** Whether the selected date is today (tracker-off is a live check). */
+  isToday: boolean;
+  /** Current time in minutes past PKT midnight, from the server. */
+  nowMinutes: number;
+  /** Today's weekday in PKT (0=Sun..6=Sat) — rest days aren't flagged for tracker-off. */
+  todayWeekday: number;
 }) {
   const [viewingUserId, setViewingUserId] = useState<string | null>(null);
 
@@ -80,17 +92,32 @@ export function ProductivityOverviewTable({
               const s = sessionByUser.get(emp.id);
               const pct = s ? productivityPercent(s.total_productive_seconds, s.total_unproductive_seconds) : null;
               const topApp = topAppByUser.get(emp.id);
+              // Flags: tracker not running during a live shift (worst), or a
+              // tracked day whose productivity is below the bar. A rest day is
+              // never flagged for tracker-off — the employee isn't scheduled.
+              const restToday = (emp.off_days ?? [0, 6]).includes(todayWeekday);
+              const trackerOff =
+                isToday && !restToday && !s && isShiftActive(emp.shift_start, emp.shift_end, nowMinutes);
+              const lowProductivity = pct !== null && pct < LOW_PRODUCTIVITY_PCT;
+              const rowTint = trackerOff ? "bg-red-50" : lowProductivity ? "bg-amber-50" : s ? "hover:bg-slate-50" : "";
               return (
                 <tr
                   key={emp.id}
                   onClick={() => s && setViewingUserId(emp.id)}
-                  className={`text-slate-600 ${s ? "cursor-pointer hover:bg-slate-50" : ""}`}
+                  className={`text-slate-600 ${s ? "cursor-pointer" : ""} ${rowTint}`}
                 >
                   <td className="px-6 py-3">
                     <div className="flex items-center gap-3">
                       <Avatar name={emp.full_name} src={emp.avatar_url} size={32} />
                       <div>
-                        <div className="font-medium text-navy">{emp.full_name}</div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-medium text-navy">{emp.full_name}</span>
+                          {trackerOff ? (
+                            <span className="badge bg-red-100 text-red-700">Tracker off</span>
+                          ) : lowProductivity ? (
+                            <span className="badge bg-amber-100 text-amber-700">Low</span>
+                          ) : null}
+                        </div>
                         <div className="text-xs text-slate-400">{emp.position || "—"}</div>
                       </div>
                     </div>
@@ -105,7 +132,9 @@ export function ProductivityOverviewTable({
                   <td className="px-6 py-3 text-amber-600">
                     {s ? formatHours(s.total_unproductive_seconds / 3600) : "—"}
                   </td>
-                  <td className="px-6 py-3 font-medium text-navy">{pct === null ? "—" : `${pct}%`}</td>
+                  <td className={`px-6 py-3 font-semibold ${lowProductivity ? "text-amber-600" : "text-navy"}`}>
+                    {pct === null ? "—" : `${pct}%`}
+                  </td>
                   <td className="px-6 py-3 text-slate-500">{topApp ? formatAppName(topApp) : "—"}</td>
                 </tr>
               );
@@ -113,6 +142,11 @@ export function ProductivityOverviewTable({
           </tbody>
         </table>
       </div>
+
+      <p className="mt-2 text-center text-xs text-slate-400">
+        <span className="font-medium text-amber-600">Amber</span> — productivity under {LOW_PRODUCTIVITY_PCT}%.{" "}
+        <span className="font-medium text-red-600">Red</span> — tracker not running during an active shift.
+      </p>
 
       {viewingEmployee && (
         <AppBreakdownModal

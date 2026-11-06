@@ -133,6 +133,21 @@ export function formatOffDays(offDays: number[]): string {
     .join(", ");
 }
 
+/**
+ * Whether `nowMinutes` (minutes past PKT midnight) falls within a shift whose
+ * start/end are "HH:MM"(":SS") strings. Overnight-aware: when end <= start the
+ * shift wraps past midnight (e.g. 18:00–03:00).
+ */
+export function isShiftActive(shiftStart: string, shiftEnd: string, nowMinutes: number): boolean {
+  const toMin = (t: string) => {
+    const [h, m] = t.split(":").map(Number);
+    return h * 60 + m;
+  };
+  const start = toMin(shiftStart);
+  const end = toMin(shiftEnd);
+  return end > start ? nowMinutes >= start && nowMinutes < end : nowMinutes >= start || nowMinutes < end;
+}
+
 export function monthKeyOf(date: Date): string {
   return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
 }
