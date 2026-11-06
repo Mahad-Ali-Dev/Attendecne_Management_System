@@ -29,7 +29,7 @@ export function AttendanceWidget({
     startTransition(async () => {
       const res = action === "in" ? await checkIn() : await checkOut();
       setBusy(null);
-      if ("error" in res) setError(res.error);
+      if ("error" in res && res.error) setError(res.error);
       else router.refresh();
     });
   }
