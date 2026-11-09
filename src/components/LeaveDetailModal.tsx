@@ -5,8 +5,14 @@ import { Modal } from "@/components/Modal";
 import { Avatar } from "@/components/Avatar";
 import { LEAVE_STATUS_STYLE, leaveDayCount, titleCase } from "@/lib/leave";
 import { formatDate } from "@/lib/format";
-import type { LeaveRequest, Profile } from "@/lib/types";
+import type { LeaveRequest, LeaveStatus, Profile } from "@/lib/types";
 import { Loader2 } from "lucide-react";
+
+const LEAD_TEXT: Record<LeaveStatus, string> = {
+  PENDING: "text-amber-600",
+  APPROVED: "text-emerald-600",
+  REJECTED: "text-red-600",
+};
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -25,12 +31,15 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 export function LeaveDetailModal({
   request: r,
   employee,
+  leadName,
   onClose,
   onReview,
   busy = false,
 }: {
   request: LeaveRequest;
   employee?: Profile | null;
+  /** Name of the team lead who gave the first-step decision, if any. */
+  leadName?: string | null;
   onClose: () => void;
   onReview?: (approve: boolean) => void;
   busy?: boolean;
@@ -92,6 +101,20 @@ export function LeaveDetailModal({
             {reason || <span className="text-slate-400">No reason given.</span>}
           </p>
         </div>
+
+        {r.lead_status && (
+          <div className="rounded-lg border border-slate-100 bg-slate-50 px-3.5 py-2.5">
+            <div className="text-xs font-medium uppercase tracking-wide text-slate-400">Team lead review</div>
+            <p className="mt-1 text-sm">
+              <span className={`font-semibold ${LEAD_TEXT[r.lead_status]}`}>{titleCase(r.lead_status)}</span>
+              {leadName ? <span className="text-slate-500"> by {leadName}</span> : null}
+              {r.lead_reviewed_at ? (
+                <span className="text-slate-400"> · {formatDate(r.lead_reviewed_at)}</span>
+              ) : null}
+            </p>
+            <p className="mt-1 text-xs text-slate-400">Advisory only — your approval is the final decision.</p>
+          </div>
+        )}
 
         {r.status !== "PENDING" && r.reviewed_at && (
           <p className="text-xs text-slate-400">

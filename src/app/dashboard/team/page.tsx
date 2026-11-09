@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { StatCard } from "@/components/StatCard";
 import { type ExtendedStatus } from "@/components/StatusBadge";
 import { TeamMembersTable, type TeamRow } from "./TeamMembersTable";
+import { TeamLeaveReview } from "./TeamLeaveReview";
 import { fetchAll } from "@/lib/fetchAll";
 import { leaveDatesSet } from "@/lib/payroll";
 import { buildReportRow } from "@/lib/report";
@@ -51,7 +52,7 @@ export default async function TeamPage({ searchParams }: { searchParams: { month
 
   // RLS scopes attendance/leave/productivity/tickets to this lead's own team,
   // so these "whole month" reads only ever return team members' rows.
-  const [members, monthAtt, todayAtt, leaves, sessions, tickets] = await Promise.all([
+  const [members, monthAtt, todayAtt, leaves, sessions, tickets, pendingLeaveRaw] = await Promise.all([
     fetchAll<Profile>((f, t) =>
       supabase.from("profiles").select("*").eq("team_lead_id", lead.id).order("full_name").order("id").range(f, t)
     ),
@@ -76,6 +77,12 @@ export default async function TeamPage({ searchParams }: { searchParams: { month
     fetchAll<TicketReport>((f, t) =>
       supabase.from("ticket_reports").select("*").gte("work_date", monthStart).lte("work_date", monthEnd).order("id").range(f, t)
     ),
+    // Every leave request still awaiting a final decision. RLS returns this
+    // lead's members' requests (and the lead's own); we keep only members'
+    // below, for the first-step review section.
+    fetchAll<LeaveRequest>((f, t) =>
+      supabase.from("leave_requests").select("*").eq("status", "PENDING").order("created_at", { ascending: false }).range(f, t)
+    ),
   ]);
 
   const attByUser = groupByUser(monthAtt);
@@ -83,6 +90,10 @@ export default async function TeamPage({ searchParams }: { searchParams: { month
   const sessByUser = groupByUser(sessions);
   const ticketByUser = groupByUser(tickets);
   const todayByUser = new Map(todayAtt.map((a) => [a.user_id, a]));
+
+  // Pending leave from this lead's own members (never the lead's own request).
+  const memberIdSet = new Set(members.map((m) => m.id));
+  const teamPendingLeave = pendingLeaveRaw.filter((r) => memberIdSet.has(r.user_id));
 
   const nowPkt = pktNow();
   const nowMinutes = nowPkt.getUTCHours() * 60 + nowPkt.getUTCMinutes();
@@ -225,6 +236,10 @@ export default async function TeamPage({ searchParams }: { searchParams: { month
         <StatCard icon={<CalendarOff className="h-5 w-5" />} label="On leave today" value={onLeaveTodayCount} accent="text-brand-600" />
         <StatCard icon={<UserX className="h-5 w-5" />} label="Absent today" value={absentTodayCount} accent="text-red-500" />
       </div>
+
+      {teamPendingLeave.length > 0 && (
+        <TeamLeaveReview requests={teamPendingLeave} members={members} />
+      )}
 
       {members.length === 0 ? (
         <div className="card px-6 py-12 text-center text-sm text-slate-400">

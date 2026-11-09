@@ -75,6 +75,10 @@ export interface LeaveRequest {
   status: LeaveStatus;
   reviewed_by: string | null;
   reviewed_at: string | null;
+  /** Team lead's first-step decision, or null when the requester has no team lead. */
+  lead_status: LeaveStatus | null;
+  lead_reviewed_by: string | null;
+  lead_reviewed_at: string | null;
   created_at: string;
 }
 

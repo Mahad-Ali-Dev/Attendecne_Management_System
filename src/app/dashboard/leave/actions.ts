@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { notifyAdmins } from "@/lib/notify";
+import { notifyAdmins, notifyUser } from "@/lib/notify";
 import { formatDate } from "@/lib/format";
 
 const LEAVE_TYPES = ["SICK", "CASUAL", "ANNUAL", "OTHER"];
@@ -19,6 +19,15 @@ export async function requestLeave(startDate: string, endDate: string, leaveType
   if (endDate < startDate) return { error: "End date must be on or after the start date." };
 
   const type = LEAVE_TYPES.includes(leaveType) ? leaveType : "CASUAL";
+
+  // Who the requester reports to, if anyone — drives the two-step flow: a team
+  // member's request also goes to their lead for a first-step review.
+  const { data: me } = await supabase
+    .from("profiles")
+    .select("full_name, team_lead_id")
+    .eq("id", user.id)
+    .single();
+  const teamLeadId = (me?.team_lead_id as string | null) ?? null;
 
   const { data: overlapping } = await supabase
     .from("leave_requests")
@@ -38,18 +47,31 @@ export async function requestLeave(startDate: string, endDate: string, leaveType
     end_date: endDate,
     leave_type: type,
     reason: reason.trim() || null,
+    // Team members start at the team-lead step; everyone else is admin-only.
+    lead_status: teamLeadId ? "PENDING" : null,
   });
 
   if (error) return { error: error.message };
 
-  const employeeName = (user.user_metadata as { full_name?: string } | null)?.full_name || user.email || "An employee";
+  const employeeName =
+    me?.full_name || (user.user_metadata as { full_name?: string } | null)?.full_name || user.email || "An employee";
   await notifyAdmins(
     "LEAVE_REQUESTED",
     `${employeeName} requested leave for ${formatDate(startDate)} – ${formatDate(endDate)}.`,
     "/admin/leave"
   );
+  // A team member's request also reaches their lead for the first-step review.
+  if (teamLeadId) {
+    await notifyUser(
+      teamLeadId,
+      "LEAVE_REQUESTED",
+      `${employeeName} (your team member) requested leave for ${formatDate(startDate)} – ${formatDate(endDate)}.`,
+      "/dashboard/team"
+    );
+  }
 
   revalidatePath("/dashboard/leave");
+  revalidatePath("/dashboard/team");
   return { ok: true };
 }
 

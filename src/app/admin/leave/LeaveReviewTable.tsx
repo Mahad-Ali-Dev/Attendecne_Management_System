@@ -11,6 +11,11 @@ import type { LeaveRequest, LeaveStatus, Profile } from "@/lib/types";
 import { Check, X, Loader2 } from "lucide-react";
 
 const STATUS_RANK: Record<LeaveStatus, number> = { PENDING: 0, APPROVED: 1, REJECTED: 2 };
+const LEAD_TEXT: Record<LeaveStatus, string> = {
+  PENDING: "text-amber-600",
+  APPROVED: "text-emerald-600",
+  REJECTED: "text-red-600",
+};
 
 export function LeaveReviewTable({
   requests,
@@ -90,6 +95,12 @@ export function LeaveReviewTable({
                     <span className="h-1.5 w-1.5 rounded-full bg-current opacity-70" />
                     {titleCase(r.status)}
                   </span>
+                  {r.lead_status && (
+                    <div className="mt-1 text-xs text-slate-400">
+                      Team lead:{" "}
+                      <span className={`font-medium ${LEAD_TEXT[r.lead_status]}`}>{titleCase(r.lead_status)}</span>
+                    </div>
+                  )}
                 </td>
                 <td className="px-6 py-3 text-right">
                   {r.status === "PENDING" && (
@@ -129,6 +140,7 @@ export function LeaveReviewTable({
         <LeaveDetailModal
           request={viewing}
           employee={employeeById.get(viewing.user_id)}
+          leadName={viewing.lead_reviewed_by ? employeeById.get(viewing.lead_reviewed_by)?.full_name ?? null : null}
           onClose={() => setViewing(null)}
           onReview={(approve) => act(viewing.id, approve)}
           busy={pending && actingId === viewing.id}

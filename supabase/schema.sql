@@ -123,12 +123,26 @@ create table if not exists public.leave_requests (
   status       text not null default 'PENDING' check (status in ('PENDING', 'APPROVED', 'REJECTED')),
   reviewed_by  uuid references public.profiles (id),
   reviewed_at  timestamptz,
+  -- Two-step verification: when the requester is on a team, their team lead
+  -- reviews first — lead_status goes PENDING → APPROVED/REJECTED — and the
+  -- admin sees that decision before making the final call. NULL lead_status
+  -- means the requester has no team lead (an admin-only request). The final
+  -- `status` is always the admin's and the one payroll/attendance trust.
+  lead_status      text check (lead_status in ('PENDING', 'APPROVED', 'REJECTED')),
+  lead_reviewed_by uuid references public.profiles (id),
+  lead_reviewed_at timestamptz,
   created_at   timestamptz not null default now(),
   check (end_date >= start_date)
 );
 
 create index if not exists leave_requests_user_idx on public.leave_requests (user_id);
 create index if not exists leave_requests_status_idx on public.leave_requests (status);
+
+-- Two-step leave verification (team lead reviews before the admin), added later.
+alter table public.leave_requests add column if not exists lead_status text
+  check (lead_status in ('PENDING', 'APPROVED', 'REJECTED'));
+alter table public.leave_requests add column if not exists lead_reviewed_by uuid references public.profiles (id);
+alter table public.leave_requests add column if not exists lead_reviewed_at timestamptz;
 
 -- ---------------------------------------------------------------------------
 -- 2d. NOTIFICATIONS  (in-app alerts — leave requested / approved / rejected)
@@ -323,6 +337,15 @@ create policy "cancel own pending leave request" on public.leave_requests
 drop policy if exists "admin reviews any leave request" on public.leave_requests;
 create policy "admin reviews any leave request" on public.leave_requests
   for update using (public.is_admin()) with check (public.is_admin());
+
+-- A team lead reviews their own members' leave first (two-step verification).
+-- They may touch a member's PENDING request to stamp lead_status, but the
+-- `with check (status = 'PENDING')` keeps them from making the final call —
+-- only the admin policy above can move status off PENDING.
+drop policy if exists "team lead reviews member leave" on public.leave_requests;
+create policy "team lead reviews member leave" on public.leave_requests
+  for update using (public.leads_member(user_id) and status = 'PENDING')
+  with check (public.leads_member(user_id) and status = 'PENDING');
 
 -- notifications ------------------------------------------------------------
 drop policy if exists "read own notifications" on public.notifications;
