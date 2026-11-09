@@ -18,6 +18,7 @@ import type {
   LeaveRequest,
   Profile,
   ProductivitySession,
+  TicketReport,
 } from "@/lib/types";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
@@ -64,7 +65,7 @@ export default async function AdminReportsPage({
 
   // Every query pages through its results: Supabase returns at most 1000 rows
   // per request, which a month of attendance for a larger team would exceed.
-  const [profiles, attendance, leaves, sessions] = await Promise.all([
+  const [profiles, attendance, leaves, sessions, tickets] = await Promise.all([
     fetchAll<Profile>((from, to) =>
       supabase
         .from("profiles")
@@ -100,11 +101,27 @@ export default async function AdminReportsPage({
         .order("id")
         .range(from, to),
     ),
+    fetchAll<TicketReport>((from, to) =>
+      supabase
+        .from("ticket_reports")
+        .select("*")
+        .gte("work_date", monthStart)
+        .lte("work_date", monthEnd)
+        .order("id")
+        .range(from, to),
+    ),
   ]);
 
   const attendanceByUser = groupByUser(attendance);
   const leaveByUser = groupByUser(leaves);
   const sessionsByUser = groupByUser(sessions);
+
+  // Tickets each employee solved this month, summed per person for the new
+  // "Tickets solved" report column.
+  const ticketsByUser = new Map<string, number>();
+  for (const t of tickets) {
+    ticketsByUser.set(t.user_id, (ticketsByUser.get(t.user_id) ?? 0) + t.tickets_solved);
+  }
 
   // Someone who registered after this month ended wasn't an employee yet; and
   // someone disabled before this month began has left — both drop out, while a
@@ -122,6 +139,7 @@ export default async function AdminReportsPage({
       attendanceByUser.get(emp.id) ?? [],
       leaveDatesSet(leaveByUser.get(emp.id) ?? []),
       sessionsByUser.get(emp.id) ?? [],
+      ticketsByUser.get(emp.id) ?? 0,
     ),
   );
 
@@ -183,7 +201,7 @@ export default async function AdminReportsPage({
       ) : (
         <div className="card overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1280px] text-sm">
+            <table className="w-full min-w-[1580px] text-sm">
               <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-400">
                 <tr>
                   <th className="sticky left-0 z-10 min-w-[13rem] bg-slate-50 px-6 py-3 text-left font-medium">
@@ -236,7 +254,8 @@ export default async function AdminReportsPage({
         Rest days are excluded throughout. Required days are the month&apos;s working days (approved leave
         included); Required hours exclude approved leave so time off doesn&apos;t lower attendance. Extra days
         are rest days the employee worked. Total days worked = Present + Extra days. Paid working days =
-        Present + Extra days + Leaves. Click an employee for their full month.
+        Present + Extra days + Leaves. Tickets solved is this month&apos;s logged support tickets (support agents
+        only). Click an employee for their full month.
       </p>
     </div>
   );

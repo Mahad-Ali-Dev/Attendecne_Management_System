@@ -21,7 +21,12 @@ export interface ReportRow {
   requiredHours: number;
   completedHours: number;
   requiredTrackingHours: number;
+  /** Productive hours tracked. */
   trackedHours: number;
+  /** Unproductive hours tracked. */
+  trackedUnproductiveHours: number;
+  /** Support tickets solved this month; null for employees who aren't support agents. */
+  ticketsSolved: number | null;
 }
 
 /** Whole-number percent of `done` against `required`; null when nothing was required. */
@@ -51,7 +56,9 @@ export const REPORT_COLUMNS: ReportColumn[] = [
   { key: "requiredHours", label: "Required hours", value: (r) => formatHours(r.requiredHours) },
   { key: "completedHours", label: "Completed hours", value: (r) => formatHours(r.completedHours) },
   { key: "requiredTracking", label: "Required tracking", value: (r) => formatHours(r.requiredTrackingHours) },
-  { key: "completedTracking", label: "Completed tracking", value: (r) => formatHours(r.trackedHours) },
+  { key: "totalTracking", label: "Total tracked", value: (r) => formatHours(r.trackedHours + r.trackedUnproductiveHours) },
+  { key: "completedTracking", label: "Productive", value: (r) => formatHours(r.trackedHours) },
+  { key: "unproductiveTracking", label: "Unproductive", value: (r) => formatHours(r.trackedUnproductiveHours) },
   // The day columns, in payroll reading order: required days first, then how
   // that split out (present, absent, leave, extra), then the two bold totals a
   // by-the-day payroll needs — days actually worked, and days actually paid.
@@ -68,6 +75,13 @@ export const REPORT_COLUMNS: ReportColumn[] = [
     label: "Paid working days",
     strong: true,
     value: (r) => String(r.presentDays + r.extraDays + r.leaveDays),
+  },
+  // Tickets a support agent logged this month. "—" for everyone else, so the
+  // column reads clean on a roster that's mostly non-support staff.
+  {
+    key: "ticketsSolved",
+    label: "Tickets solved",
+    value: (r) => (r.ticketsSolved === null ? "—" : String(r.ticketsSolved)),
   },
   { key: "attendancePct", label: "Attendance", value: (r) => pct(percentOf(r.completedHours, r.requiredHours)) },
   { key: "trackingPct", label: "Tracking", value: (r) => pct(percentOf(r.trackedHours, r.requiredTrackingHours)) },
@@ -88,7 +102,9 @@ export function buildReportRow(
   todayKey: string,
   attendance: Attendance[],
   leaveDates: Set<string>,
-  sessions: ProductivitySession[]
+  sessions: ProductivitySession[],
+  /** Support tickets this employee solved in the month (0 if none / not a support agent). */
+  monthTickets = 0
 ): ReportRow {
   const shiftHours = shiftLengthHours(employee.shift_start, employee.shift_end);
   const days = buildMonthDayHours(attendance, monthKey, shiftHours, todayKey, leaveDates, employee.off_days ?? [0, 6]);
@@ -118,5 +134,11 @@ export function buildReportRow(
     completedHours: toWholeMinutes(days.reduce((sum, d) => sum + d.hours, 0)),
     requiredTrackingHours: netWorkingDays * requiredProductiveHours(shiftHours),
     trackedHours: toWholeMinutes(sessions.reduce((sum, s) => sum + s.total_productive_seconds, 0) / 3600),
+    trackedUnproductiveHours: toWholeMinutes(
+      sessions.reduce((sum, s) => sum + s.total_unproductive_seconds, 0) / 3600
+    ),
+    // Show a figure for support agents (even 0) and for anyone who logged
+    // tickets this month; "—" for the rest so the column isn't a wall of zeros.
+    ticketsSolved: (employee.is_support ?? false) || monthTickets > 0 ? monthTickets : null,
   };
 }

@@ -113,13 +113,22 @@ export default async function TeamPage({ searchParams }: { searchParams: { month
       !onLeaveToday &&
       !memberSessions.some((sn) => sn.work_date === todayKey) &&
       (!!todayRec?.check_in || isShiftActive(m.shift_start, m.shift_end, nowMinutes));
-    // Low productivity across the month's tracked time.
-    const prodPct = productivityPercent(
-      memberSessions.reduce((sum, x) => sum + x.total_productive_seconds, 0),
-      memberSessions.reduce((sum, x) => sum + x.total_unproductive_seconds, 0)
-    );
+    // Month's tracked time, split productive / unproductive.
+    const prodSec = memberSessions.reduce((sum, x) => sum + x.total_productive_seconds, 0);
+    const unprodSec = memberSessions.reduce((sum, x) => sum + x.total_unproductive_seconds, 0);
+    const prodPct = productivityPercent(prodSec, unprodSec);
     const lowProductivity = prodPct !== null && prodPct < LOW_PRODUCTIVITY_PCT;
-    return { member: m, report, ticketsThisMonth, todayStatus, trackerOff, lowProductivity };
+    return {
+      member: m,
+      report,
+      ticketsThisMonth,
+      todayStatus,
+      trackerOff,
+      lowProductivity,
+      totalTrackedHours: (prodSec + unprodSec) / 3600,
+      productiveHours: prodSec / 3600,
+      unproductiveHours: unprodSec / 3600,
+    };
   });
 
   const presentToday = rows.filter((r) => todayByUser.get(r.member.id)?.check_in).length;
@@ -206,7 +215,7 @@ export default async function TeamPage({ searchParams }: { searchParams: { month
       ) : (
         <div className="card overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px] text-sm">
+            <table className="w-full min-w-[1080px] text-sm">
               <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-400">
                 <tr>
                   <th className="sticky left-0 z-10 min-w-[13rem] bg-slate-50 px-6 py-3 text-left font-medium">Member</th>
@@ -215,12 +224,25 @@ export default async function TeamPage({ searchParams }: { searchParams: { month
                   <th className={th}>Absent</th>
                   <th className={th}>Leave</th>
                   <th className={th}>Hours ({monthLabel.split(" ")[0]})</th>
+                  <th className={th}>Tracked</th>
                   <th className={th}>Productive</th>
+                  <th className={th}>Unproductive</th>
                   {anySupport && <th className={th}>Tickets</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
-                {rows.map(({ member, report, ticketsThisMonth, todayStatus, trackerOff, lowProductivity }) => {
+                {rows.map(
+                  ({
+                    member,
+                    report,
+                    ticketsThisMonth,
+                    todayStatus,
+                    trackerOff,
+                    lowProductivity,
+                    totalTrackedHours,
+                    productiveHours,
+                    unproductiveHours,
+                  }) => {
                   const tint = trackerOff ? "bg-red-50" : lowProductivity ? "bg-amber-50" : "";
                   return (
                   <tr key={member.id} className={`text-slate-600 ${tint}`}>
@@ -256,7 +278,9 @@ export default async function TeamPage({ searchParams }: { searchParams: { month
                       <span className="font-semibold text-navy">{formatHours(report.completedHours)}</span>
                       <span className="text-slate-400"> / {formatHours(report.requiredHours)}</span>
                     </td>
-                    <td className={td}>{formatHours(report.trackedHours)}</td>
+                    <td className={td}>{formatHours(totalTrackedHours)}</td>
+                    <td className={`${td} text-emerald-600`}>{formatHours(productiveHours)}</td>
+                    <td className={`${td} text-amber-600`}>{formatHours(unproductiveHours)}</td>
                     {anySupport && (
                       <td className={td}>{member.is_support ? ticketsThisMonth : <span className="text-slate-300">—</span>}</td>
                     )}
@@ -271,9 +295,9 @@ export default async function TeamPage({ searchParams }: { searchParams: { month
 
       {members.length > 0 && (
         <p className="text-center text-xs text-slate-400">
-          Today&apos;s status is live. Present, Absent, Leave, Hours and Productive are for {monthLabel}; Hours shows
-          worked / expected. Amber row = productivity under {LOW_PRODUCTIVITY_PCT}%; red row = tracker off during an
-          active shift. Salary isn&apos;t shown here.
+          Today&apos;s status is live. Present, Absent, Leave, Hours, Tracked, Productive and Unproductive are for{" "}
+          {monthLabel}; Hours shows worked / expected. Amber row = productivity under {LOW_PRODUCTIVITY_PCT}%; red row =
+          tracker off during an active shift. Salary isn&apos;t shown here.
         </p>
       )}
     </div>

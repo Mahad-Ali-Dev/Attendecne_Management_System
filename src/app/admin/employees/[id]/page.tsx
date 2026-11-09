@@ -374,6 +374,8 @@ export default async function EmployeeDetail({
       {/* 6 — Support tickets (support agents only) */}
       {emp.is_support && (
         <EmployeeTickets
+          employeeId={emp.id}
+          editable
           monthLabel={monthLabel}
           monthStart={hoursMonthStart}
           monthEnd={historyEnd}

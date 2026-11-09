@@ -10,7 +10,10 @@ const REPORT_GROUPS: { title: string; keys: string[] }[] = [
     keys: ["requiredDays", "presentDays", "absentDays", "leaves", "extraDays", "daysWorked", "paidWorkingDays"],
   },
   { title: "Hours", keys: ["requiredHours", "completedHours", "attendancePct"] },
-  { title: "Tracking", keys: ["requiredTracking", "completedTracking", "trackingPct"] },
+  {
+    title: "Tracking",
+    keys: ["requiredTracking", "totalTracking", "completedTracking", "unproductiveTracking", "trackingPct"],
+  },
 ];
 
 /**

@@ -174,6 +174,49 @@ export async function removeTeamMember(leadId: string, memberId: string) {
   return { ok: true };
 }
 
+/**
+ * Admin adds or corrects a support agent's ticket count for a day. Upserts the
+ * one row per (employee, day), so it both adds a missed day and fixes an
+ * existing one. Agents can only log once and can't edit, so this is the way a
+ * mistake gets fixed.
+ */
+export async function upsertTicketReport(employeeId: string, workDate: string, ticketsSolved: number) {
+  await requireAdmin();
+  const supabase = createClient();
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(workDate)) return { error: "Pick a date." };
+  if (workDate > pktNow().toISOString().slice(0, 10)) return { error: "Can't set tickets for a future date." };
+  if (!Number.isInteger(ticketsSolved) || ticketsSolved < 0) return { error: "Enter a whole number of tickets." };
+  if (ticketsSolved > 10_000) return { error: "That's an unusually large number — please check it." };
+
+  const { error } = await supabase.from("ticket_reports").upsert(
+    { user_id: employeeId, work_date: workDate, tickets_solved: ticketsSolved, updated_at: new Date().toISOString() },
+    { onConflict: "user_id,work_date" }
+  );
+
+  if (error) return { error: error.message };
+  revalidatePath(`/admin/employees/${employeeId}`);
+  revalidatePath("/admin/tickets");
+  return { ok: true };
+}
+
+/** Admin removes a day's ticket entry entirely (e.g. one logged by mistake). */
+export async function deleteTicketReport(employeeId: string, workDate: string) {
+  await requireAdmin();
+  const supabase = createClient();
+
+  const { error } = await supabase
+    .from("ticket_reports")
+    .delete()
+    .eq("user_id", employeeId)
+    .eq("work_date", workDate);
+
+  if (error) return { error: error.message };
+  revalidatePath(`/admin/employees/${employeeId}`);
+  revalidatePath("/admin/tickets");
+  return { ok: true };
+}
+
 function timeToMinutes(time: string): number {
   const [h, m] = time.split(":").map(Number);
   return h * 60 + m;
