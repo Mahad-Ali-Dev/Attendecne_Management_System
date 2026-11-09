@@ -132,7 +132,7 @@ export function buildReportRow(
     extraDays: days.filter((d) => d.isRestDay && attended(d)).length,
     requiredHours: netWorkingDays * shiftHours,
     completedHours: toWholeMinutes(days.reduce((sum, d) => sum + d.hours, 0)),
-    requiredTrackingHours: netWorkingDays * requiredProductiveHours(shiftHours),
+    requiredTrackingHours: netWorkingDays * requiredProductiveHours(shiftHours, employee.relax_minutes ?? 90),
     trackedHours: toWholeMinutes(sessions.reduce((sum, s) => sum + s.total_productive_seconds, 0) / 3600),
     trackedUnproductiveHours: toWholeMinutes(
       sessions.reduce((sum, s) => sum + s.total_unproductive_seconds, 0) / 3600

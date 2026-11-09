@@ -53,7 +53,7 @@ export default async function ProductivityPage() {
 
   const leaveDates = leaveDatesSet((leaveData ?? []) as LeaveRequest[]);
   const shiftHours = shiftLengthHours(profile.shift_start, profile.shift_end);
-  const targetHours = requiredProductiveHours(shiftHours);
+  const targetHours = requiredProductiveHours(shiftHours, profile.relax_minutes);
   const productivityDays = buildMonthProductivityDays(
     monthSessions,
     monthKey,

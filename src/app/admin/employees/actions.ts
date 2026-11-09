@@ -282,6 +282,37 @@ export async function updateEmployeeOffDays(employeeId: string, offDays: number[
   return { ok: true };
 }
 
+/**
+ * Sets how many minutes of paid relaxation / break an employee gets per working
+ * day before the tracker target applies. A day's required productive hours are
+ * their shift length minus this, so a larger allowance means a lower target.
+ * 90 minutes is the standard; clamped to 0–480 minutes.
+ */
+export async function updateEmployeeRelaxMinutes(employeeId: string, relaxMinutes: number) {
+  await requireAdmin();
+  const supabase = createClient();
+
+  if (!Number.isInteger(relaxMinutes) || relaxMinutes < 0) {
+    return { error: "Enter a whole number of minutes (0 or more)." };
+  }
+  if (relaxMinutes > 480) {
+    return { error: "Relaxation can't be more than 8 hours (480 minutes)." };
+  }
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({ relax_minutes: relaxMinutes })
+    .eq("id", employeeId);
+
+  if (error) return { error: error.message };
+  // The target feeds the productivity view, the reports table and the PDF.
+  revalidatePath(`/admin/employees/${employeeId}`);
+  revalidatePath("/admin/reports");
+  revalidatePath("/admin/productivity");
+  revalidatePath("/dashboard/productivity");
+  return { ok: true };
+}
+
 /** Builds a UTC ISO timestamp from a PKT (UTC+5) work date + wall-clock time. */
 function pktToISOString(workDate: string, time: string): string {
   return new Date(`${workDate}T${time}:00+05:00`).toISOString();

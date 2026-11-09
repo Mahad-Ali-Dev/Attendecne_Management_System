@@ -9,9 +9,14 @@ export function productivityPercent(productiveSeconds: number, unproductiveSecon
   return Math.round((productiveSeconds / total) * 100);
 }
 
-/** Productive hours an employee is expected to track on a working day, given their shift length. */
-export function requiredProductiveHours(shiftHours: number): number {
-  return Math.max(0, shiftHours - 1.5);
+/**
+ * Productive hours an employee is expected to track on a working day: their
+ * shift length minus the paid relaxation/break allowance. The allowance is
+ * per-employee (admin-set) and defaults to 90 minutes, so a 9-hour shift asks
+ * for 7.5 tracked hours.
+ */
+export function requiredProductiveHours(shiftHours: number, relaxMinutes = 90): number {
+  return Math.max(0, shiftHours - relaxMinutes / 60);
 }
 
 export interface ProductivityDayHours {

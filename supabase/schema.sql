@@ -38,6 +38,11 @@ create table if not exists public.profiles (
   -- at registration. Only support agents get the daily ticket-log screen and
   -- appear in the admin ticket report.
   is_support      boolean     not null default false,
+  -- Minutes of paid relaxation / break allowed per working day before the
+  -- tracker target applies. A day's required productive hours = shift length
+  -- minus this. Defaults to 90 minutes (a 9-hour shift ⇒ a 7.5-hour target);
+  -- an admin can raise or lower it per employee.
+  relax_minutes   integer     not null default 90,
   -- The team lead this employee reports to (another profile whose role is
   -- 'TEAM_LEAD'), or NULL if they're not on anyone's team. Admin-managed. A
   -- team lead sees their members' attendance, hours, leave, productivity and
@@ -61,6 +66,8 @@ alter table public.profiles add column if not exists off_days integer[] not null
 alter table public.profiles add column if not exists disabled_at date;
 -- Customer-support flag, off by default — an admin turns it on per employee.
 alter table public.profiles add column if not exists is_support boolean not null default false;
+-- Per-employee tracker relaxation (break) allowance in minutes; 90 by default.
+alter table public.profiles add column if not exists relax_minutes integer not null default 90;
 -- Team-lead role + team membership, added later. Widen the role check to allow
 -- 'TEAM_LEAD', then add the self-referencing link from a member to their lead.
 alter table public.profiles drop constraint if exists profiles_role_check;

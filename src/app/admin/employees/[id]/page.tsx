@@ -149,6 +149,7 @@ export default async function EmployeeDetail({
     off_days: profileData.off_days ?? [0, 6],
     disabled_at: profileData.disabled_at ?? null,
     is_support: profileData.is_support ?? false,
+    relax_minutes: profileData.relax_minutes ?? 90,
     team_lead_id: profileData.team_lead_id ?? null,
   } as Profile;
 
@@ -200,7 +201,7 @@ export default async function EmployeeDetail({
   const workingDaysTotal = hoursDays.filter((d) => !d.isRestDay).length;
   const leaveDaysTotal = hoursDays.filter((d) => d.status === "ON_LEAVE").length;
 
-  const productivityTargetHours = requiredProductiveHours(shiftHours);
+  const productivityTargetHours = requiredProductiveHours(shiftHours, emp.relax_minutes);
   const productivityRequiredHours = (workingDaysTotal - leaveDaysTotal) * productivityTargetHours;
 
   // Tickets this employee logged (only meaningful for support agents — the
@@ -301,6 +302,7 @@ export default async function EmployeeDetail({
                 offDays={emp.off_days}
                 deviceUserId={emp.device_user_id}
                 isSupport={emp.is_support}
+                relaxMinutes={emp.relax_minutes}
                 isLead={isLead}
                 disabledAt={emp.disabled_at}
                 isAdmin={isAdmin}

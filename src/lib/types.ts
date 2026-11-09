@@ -22,6 +22,8 @@ export interface Profile {
   disabled_at: string | null;
   /** Whether this employee is a customer-support agent (admin-set). */
   is_support: boolean;
+  /** Minutes of paid relaxation / break per working day before the tracker target applies (default 90). */
+  relax_minutes: number;
   /** The team lead this employee reports to, or null if on no team. */
   team_lead_id: string | null;
   created_at: string;

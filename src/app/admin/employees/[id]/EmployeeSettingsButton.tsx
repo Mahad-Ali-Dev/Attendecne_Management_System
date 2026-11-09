@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { ShiftEditForm } from "./ShiftEditForm";
+import { RelaxationEditForm } from "./RelaxationEditForm";
 import { OffDaysEditForm } from "./OffDaysEditForm";
 import { DeviceMappingForm } from "./DeviceMappingForm";
 import { SupportAgentToggle } from "./SupportAgentToggle";
@@ -23,6 +24,7 @@ export function EmployeeSettingsButton({
   offDays,
   deviceUserId,
   isSupport,
+  relaxMinutes,
   isLead,
   disabledAt,
   isAdmin,
@@ -34,6 +36,7 @@ export function EmployeeSettingsButton({
   offDays: number[];
   deviceUserId: string | null;
   isSupport: boolean;
+  relaxMinutes: number;
   isLead: boolean;
   disabledAt: string | null;
   /** The target is an administrator — hide the support / team-lead / disable controls. */
@@ -82,6 +85,12 @@ export function EmployeeSettingsButton({
             </div>
             <div className="max-h-[75vh] overflow-y-auto px-6 pb-6">
               <ShiftEditForm employeeId={employeeId} initialStart={shiftStart} initialEnd={shiftEnd} />
+              <RelaxationEditForm
+                employeeId={employeeId}
+                initialMinutes={relaxMinutes}
+                shiftStart={shiftStart}
+                shiftEnd={shiftEnd}
+              />
               <OffDaysEditForm employeeId={employeeId} initialOffDays={offDays} />
               <DeviceMappingForm employeeId={employeeId} initialValue={deviceUserId} />
               {!isAdmin && <SupportAgentToggle employeeId={employeeId} initialIsSupport={isSupport} />}
