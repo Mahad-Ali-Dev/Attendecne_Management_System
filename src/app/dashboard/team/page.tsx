@@ -2,15 +2,14 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentProfile } from "@/lib/data";
 import { createClient } from "@/lib/supabase/server";
-import { Avatar } from "@/components/Avatar";
 import { StatCard } from "@/components/StatCard";
-import { StatusBadge, type ExtendedStatus } from "@/components/StatusBadge";
+import { type ExtendedStatus } from "@/components/StatusBadge";
+import { TeamMembersTable, type TeamRow } from "./TeamMembersTable";
 import { fetchAll } from "@/lib/fetchAll";
 import { leaveDatesSet } from "@/lib/payroll";
 import { buildReportRow } from "@/lib/report";
 import { productivityPercent } from "@/lib/productivity";
 import {
-  formatHours,
   formatMonthLabel,
   isShiftActive,
   isWorkingDay,
@@ -89,11 +88,15 @@ export default async function TeamPage({ searchParams }: { searchParams: { month
   const nowMinutes = nowPkt.getUTCHours() * 60 + nowPkt.getUTCMinutes();
   const isCurrentMonth = monthKey === currentMonthKey;
 
-  const rows = members.map((m) => {
+  const rows: TeamRow[] = members.map((m) => {
     const leaveDates = leaveDatesSet(leaveByUser.get(m.id) ?? []);
     const memberSessions = sessByUser.get(m.id) ?? [];
     const report = buildReportRow(m, monthKey, todayKey, attByUser.get(m.id) ?? [], leaveDates, memberSessions);
-    const ticketsThisMonth = (ticketByUser.get(m.id) ?? []).reduce((sum, r) => sum + r.tickets_solved, 0);
+    const memberTickets = ticketByUser.get(m.id) ?? [];
+    const ticketsThisMonth = memberTickets.reduce((sum, r) => sum + r.tickets_solved, 0);
+    const todayTickets = memberTickets
+      .filter((r) => r.work_date === todayKey)
+      .reduce((sum, r) => sum + r.tickets_solved, 0);
     const todayRec = todayByUser.get(m.id);
     const onLeaveToday = leaveDates.has(todayKey);
     const restToday = !isWorkingDay(new Date(`${todayKey}T00:00:00Z`), m.off_days);
@@ -104,6 +107,10 @@ export default async function TeamPage({ searchParams }: { searchParams: { month
         : restToday
           ? "REST_DAY"
           : "ABSENT";
+    // Today's tracked time, split productive / unproductive.
+    const todaySession = memberSessions.find((s) => s.work_date === todayKey);
+    const todayProdSec = todaySession?.total_productive_seconds ?? 0;
+    const todayUnprodSec = todaySession?.total_unproductive_seconds ?? 0;
     // Tracker off: today, the member should be working — they've checked in, or
     // their shift is currently running — but nothing has been tracked yet, and
     // it's not a rest day or approved leave.
@@ -111,7 +118,7 @@ export default async function TeamPage({ searchParams }: { searchParams: { month
       isCurrentMonth &&
       !restToday &&
       !onLeaveToday &&
-      !memberSessions.some((sn) => sn.work_date === todayKey) &&
+      !todaySession &&
       (!!todayRec?.check_in || isShiftActive(m.shift_start, m.shift_end, nowMinutes));
     // Month's tracked time, split productive / unproductive.
     const prodSec = memberSessions.reduce((sum, x) => sum + x.total_productive_seconds, 0);
@@ -119,19 +126,33 @@ export default async function TeamPage({ searchParams }: { searchParams: { month
     const prodPct = productivityPercent(prodSec, unprodSec);
     const lowProductivity = prodPct !== null && prodPct < LOW_PRODUCTIVITY_PCT;
     return {
-      member: m,
-      report,
-      ticketsThisMonth,
-      todayStatus,
+      id: m.id,
+      name: m.full_name,
+      avatarUrl: m.avatar_url,
+      position: m.position,
+      isSupport: m.is_support,
       trackerOff,
       lowProductivity,
-      totalTrackedHours: (prodSec + unprodSec) / 3600,
-      productiveHours: prodSec / 3600,
-      unproductiveHours: unprodSec / 3600,
+      todayStatus,
+      todayCheckIn: todayRec?.check_in ?? null,
+      todayCheckOut: todayRec?.check_out ?? null,
+      todayTrackedHours: (todayProdSec + todayUnprodSec) / 3600,
+      todayProductiveHours: todayProdSec / 3600,
+      todayUnproductiveHours: todayUnprodSec / 3600,
+      todayTickets,
+      presentDays: report.presentDays,
+      absentDays: report.absentDays,
+      leaveDays: report.leaveDays,
+      completedHours: report.completedHours,
+      requiredHours: report.requiredHours,
+      monthTrackedHours: (prodSec + unprodSec) / 3600,
+      monthProductiveHours: prodSec / 3600,
+      monthUnproductiveHours: unprodSec / 3600,
+      monthTickets: ticketsThisMonth,
     };
   });
 
-  const presentToday = rows.filter((r) => todayByUser.get(r.member.id)?.check_in).length;
+  const presentToday = members.filter((m) => todayByUser.get(m.id)?.check_in).length;
   const onLeaveTodayCount = rows.filter((r) => r.todayStatus === "ON_LEAVE").length;
   const absentTodayCount = rows.filter((r) => r.todayStatus === "ABSENT").length;
   const anySupport = members.some((m) => m.is_support);
@@ -142,9 +163,6 @@ export default async function TeamPage({ searchParams }: { searchParams: { month
   const prevMonthKey = shiftMonthKey(monthKey, -1);
   const nextMonthKey = shiftMonthKey(monthKey, 1);
   const nextDisabled = nextMonthKey > currentMonthKey;
-
-  const th = "px-4 py-3 text-right font-medium";
-  const td = "whitespace-nowrap px-4 py-3 text-right tabular-nums";
 
   return (
     <div className="space-y-6">
@@ -188,13 +206,13 @@ export default async function TeamPage({ searchParams }: { searchParams: { month
             {trackerOffMembers.length > 0 && (
               <p>
                 <span className="font-medium text-red-600">Tracker off now</span> ({trackerOffMembers.length}):{" "}
-                {trackerOffMembers.map((r) => r.member.full_name).join(", ")}
+                {trackerOffMembers.map((r) => r.name).join(", ")}
               </p>
             )}
             {lowProductivityMembers.length > 0 && (
               <p>
                 <span className="font-medium text-amber-700">Low productivity</span> ({lowProductivityMembers.length}):{" "}
-                {lowProductivityMembers.map((r) => r.member.full_name).join(", ")}
+                {lowProductivityMembers.map((r) => r.name).join(", ")}
               </p>
             )}
           </div>
@@ -213,92 +231,13 @@ export default async function TeamPage({ searchParams }: { searchParams: { month
           No one is on your team yet. An admin assigns your members.
         </div>
       ) : (
-        <div className="card overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[1080px] text-sm">
-              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-400">
-                <tr>
-                  <th className="sticky left-0 z-10 min-w-[13rem] bg-slate-50 px-6 py-3 text-left font-medium">Member</th>
-                  <th className="px-4 py-3 text-left font-medium">Today</th>
-                  <th className={th}>Present</th>
-                  <th className={th}>Absent</th>
-                  <th className={th}>Leave</th>
-                  <th className={th}>Hours ({monthLabel.split(" ")[0]})</th>
-                  <th className={th}>Tracked</th>
-                  <th className={th}>Productive</th>
-                  <th className={th}>Unproductive</th>
-                  {anySupport && <th className={th}>Tickets</th>}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {rows.map(
-                  ({
-                    member,
-                    report,
-                    ticketsThisMonth,
-                    todayStatus,
-                    trackerOff,
-                    lowProductivity,
-                    totalTrackedHours,
-                    productiveHours,
-                    unproductiveHours,
-                  }) => {
-                  const tint = trackerOff ? "bg-red-50" : lowProductivity ? "bg-amber-50" : "";
-                  return (
-                  <tr key={member.id} className={`text-slate-600 ${tint}`}>
-                    <td className={`sticky left-0 z-10 min-w-[13rem] px-6 py-3 ${tint || "bg-white"}`}>
-                      <Link
-                        href={`/dashboard/team/${member.id}?month=${monthKey}`}
-                        className="flex items-center gap-3 hover:underline"
-                      >
-                        <Avatar name={member.full_name} src={member.avatar_url} size={30} />
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="truncate font-medium text-navy">{member.full_name}</span>
-                            {trackerOff ? (
-                              <span className="badge shrink-0 bg-red-100 text-red-700">Tracker off</span>
-                            ) : lowProductivity ? (
-                              <span className="badge shrink-0 bg-amber-100 text-amber-700">Low</span>
-                            ) : null}
-                          </div>
-                          <div className="truncate text-xs text-slate-400">
-                            {member.position || "Employee"}
-                            {member.is_support ? " · Support" : ""}
-                          </div>
-                        </div>
-                      </Link>
-                    </td>
-                    <td className="px-4 py-3">
-                      <StatusBadge status={todayStatus} />
-                    </td>
-                    <td className={td}>{report.presentDays}</td>
-                    <td className={td}>{report.absentDays}</td>
-                    <td className={td}>{report.leaveDays}</td>
-                    <td className={td}>
-                      <span className="font-semibold text-navy">{formatHours(report.completedHours)}</span>
-                      <span className="text-slate-400"> / {formatHours(report.requiredHours)}</span>
-                    </td>
-                    <td className={td}>{formatHours(totalTrackedHours)}</td>
-                    <td className={`${td} text-emerald-600`}>{formatHours(productiveHours)}</td>
-                    <td className={`${td} text-amber-600`}>{formatHours(unproductiveHours)}</td>
-                    {anySupport && (
-                      <td className={td}>{member.is_support ? ticketsThisMonth : <span className="text-slate-300">—</span>}</td>
-                    )}
-                  </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {members.length > 0 && (
-        <p className="text-center text-xs text-slate-400">
-          Today&apos;s status is live. Present, Absent, Leave, Hours, Tracked, Productive and Unproductive are for{" "}
-          {monthLabel}; Hours shows worked / expected. Amber row = productivity under {LOW_PRODUCTIVITY_PCT}%; red row =
-          tracker off during an active shift. Salary isn&apos;t shown here.
-        </p>
+        <TeamMembersTable
+          rows={rows}
+          monthLabel={monthLabel}
+          monthKey={monthKey}
+          anySupport={anySupport}
+          lowProductivityPct={LOW_PRODUCTIVITY_PCT}
+        />
       )}
     </div>
   );
