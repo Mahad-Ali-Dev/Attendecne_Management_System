@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/data";
 import { createClient } from "@/lib/supabase/server";
-import { Avatar } from "@/components/Avatar";
 import { StatCard } from "@/components/StatCard";
+import { TicketsAgentList, type AgentTicketRow } from "./TicketsAgentList";
 import { fetchAll } from "@/lib/fetchAll";
 import {
   formatMonthLabel,
@@ -63,10 +63,19 @@ export default async function AdminTicketsPage({
   const lastDay = monthKey === currentMonthKey ? Number(todayKey.slice(8, 10)) : daysInMonth;
   const dayKeys = Array.from({ length: lastDay }, (_, i) => `${monthKey}-${String(i + 1).padStart(2, "0")}`);
 
-  const rows = agents.map((agent) => {
+  const rows: AgentTicketRow[] = agents.map((agent) => {
     const m = monthCounts.get(agent.id);
     const monthTotal = m ? Array.from(m.values()).reduce((s, n) => s + n, 0) : 0;
-    return { agent, dayMap: m, monthTotal, allTime: allTimeByUser.get(agent.id) ?? 0 };
+    return {
+      id: agent.id,
+      name: agent.full_name,
+      position: agent.position,
+      avatarUrl: agent.avatar_url,
+      monthTotal,
+      allTime: allTimeByUser.get(agent.id) ?? 0,
+      // One entry per day of the month (zero-filled) for the expandable table.
+      days: dayKeys.map((d) => ({ date: d, count: m?.get(d) ?? 0 })),
+    };
   });
 
   const monthGrandTotal = rows.reduce((s, r) => s + r.monthTotal, 0);
@@ -128,66 +137,12 @@ export default async function AdminTicketsPage({
           <span className="font-medium text-slate-500">Customer support agent</span> to start tracking tickets.
         </div>
       ) : (
-        <div className="card overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px] text-sm">
-              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-400">
-                <tr>
-                  <th className="sticky left-0 z-10 min-w-[12rem] bg-slate-50 px-6 py-3 text-left font-medium">
-                    Agent
-                  </th>
-                  {dayKeys.map((d) => (
-                    <th key={d} className="px-2 py-3 text-right font-medium tabular-nums">
-                      {Number(d.slice(8, 10))}
-                    </th>
-                  ))}
-                  <th className="px-4 py-3 text-right font-medium text-navy">{monthLabel.split(" ")[0]} total</th>
-                  <th className="px-4 py-3 text-right font-medium text-navy">All time</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {rows.map(({ agent, dayMap, monthTotal, allTime }) => (
-                  <tr key={agent.id} className="text-slate-600">
-                    <td className="sticky left-0 z-10 min-w-[12rem] bg-white px-6 py-3">
-                      <Link
-                        href={`/admin/employees/${agent.id}?month=${monthKey}`}
-                        className="flex items-center gap-3 hover:underline"
-                      >
-                        <Avatar name={agent.full_name} src={agent.avatar_url} size={30} />
-                        <div>
-                          <div className="font-medium text-navy">{agent.full_name}</div>
-                          <div className="text-xs text-slate-400">{agent.position || "Support"}</div>
-                        </div>
-                      </Link>
-                    </td>
-                    {dayKeys.map((d) => {
-                      const n = dayMap?.get(d) ?? 0;
-                      return (
-                        <td
-                          key={d}
-                          className={`px-2 py-3 text-right tabular-nums ${n ? "text-slate-700" : "text-slate-300"}`}
-                        >
-                          {n || "·"}
-                        </td>
-                      );
-                    })}
-                    <td className="whitespace-nowrap px-4 py-3 text-right font-semibold tabular-nums text-navy">
-                      {monthTotal}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-right font-semibold tabular-nums text-navy">
-                      {allTime}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <TicketsAgentList rows={rows} monthLabel={monthLabel} monthKey={monthKey} />
       )}
 
       <p className="text-center text-xs text-slate-400">
-        Numbered columns are days of {monthLabel}; a dot means nothing was logged. Agents record their own
-        counts from their Tickets tab.
+        Click an agent to see their day-by-day tickets for {monthLabel}. Agents record their own counts from
+        their Tickets tab.
       </p>
     </div>
   );
