@@ -3,7 +3,8 @@ import { redirect } from "next/navigation";
 import { getCurrentProfile } from "@/lib/data";
 import { createClient } from "@/lib/supabase/server";
 import { StatCard } from "@/components/StatCard";
-import { TicketsAgentList, type AgentTicketRow } from "@/app/admin/tickets/TicketsAgentList";
+import type { AgentTicketRow } from "@/app/admin/tickets/TicketsAgentList";
+import { TeamTicketsView } from "./TeamTicketsView";
 import { fetchAll } from "@/lib/fetchAll";
 import { formatMonthLabel, isActiveInMonth, monthKeyOf, pktNow, shiftMonthKey } from "@/lib/format";
 import type { Profile, TicketReport } from "@/lib/types";
@@ -75,6 +76,10 @@ export default async function TeamTicketsPage({ searchParams }: { searchParams: 
 
   const monthGrandTotal = rows.reduce((s, r) => s + r.monthTotal, 0);
   const allTimeGrandTotal = rows.reduce((s, r) => s + r.allTime, 0);
+  const isCurrentMonth = monthKey === currentMonthKey;
+  const monthStart = `${monthKey}-01`;
+  const monthEnd = `${monthKey}-${String(daysInMonth).padStart(2, "0")}`;
+  const maxDate = isCurrentMonth ? todayKey : monthEnd;
 
   const monthLabel = formatMonthLabel(monthKey);
   const prevMonthKey = shiftMonthKey(monthKey, -1);
@@ -131,18 +136,19 @@ export default async function TeamTicketsPage({ searchParams }: { searchParams: 
           No support agents on your team yet. An admin assigns members and marks who handles customer support.
         </div>
       ) : (
-        <TicketsAgentList
+        <TeamTicketsView
           rows={rows}
           monthLabel={monthLabel}
           monthKey={monthKey}
-          editable={false}
           profileBasePath="/dashboard/team"
+          monthStart={monthStart}
+          maxDate={maxDate}
         />
       )}
 
       <p className="text-center text-xs text-slate-400">
-        Click an agent to see their day-by-day tickets for {monthLabel}. Agents record their own counts from
-        their Tickets tab.
+        By agent shows each person&apos;s month; by date shows one day across the team. Agents record their own
+        counts from their Tickets tab.
       </p>
     </div>
   );
