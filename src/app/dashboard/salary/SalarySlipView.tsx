@@ -76,7 +76,7 @@ export function SalarySlipView({
           <dl className="mt-2 space-y-1.5 text-sm">
             <DetailRow label="Working days" value={String(attendanceSummary.workingDays)} />
             <DetailRow label="Present" value={String(attendanceSummary.present)} />
-            <DetailRow label="Late" value={String(attendanceSummary.late)} />
+            <DetailRow label="Extra days" value={String(attendanceSummary.extra)} />
             <DetailRow label="On leave" value={String(attendanceSummary.onLeave)} />
             <DetailRow label="Absent" value={String(attendanceSummary.absent)} />
           </dl>

@@ -50,22 +50,26 @@ export default async function SalarySlipPage({
 
   let workingDays = 0;
   let present = 0;
-  let late = 0;
+  let extra = 0;
   let absent = 0;
   let onLeave = 0;
   for (let d = 1; d <= daysInMonth; d++) {
     const dateObj = new Date(Date.UTC(year, month - 1, d));
-    if (!isWorkingDay(dateObj, profile.off_days)) continue;
     const dateStr = `${monthKey}-${String(d).padStart(2, "0")}`;
     if (dateStr > todayKey) continue; // don't count days that haven't happened yet
+    const rec = byDate.get(dateStr);
+    if (!isWorkingDay(dateObj, profile.off_days)) {
+      // A rest day the employee worked anyway counts as an extra day.
+      if (rec?.check_in) extra++;
+      continue;
+    }
     workingDays++;
     if (leaveDates.has(dateStr)) {
       onLeave++;
       continue;
     }
-    const rec = byDate.get(dateStr);
+    // A late check-in is still a day present, so it isn't singled out here.
     if (!rec?.check_in) absent++;
-    else if (rec.status === "LATE") late++;
     else present++;
   }
 
@@ -109,7 +113,7 @@ export default async function SalarySlipPage({
         slip={slip}
         monthLabel={monthLabel}
         monthKey={monthKey}
-        attendanceSummary={{ workingDays, present, late, absent, onLeave }}
+        attendanceSummary={{ workingDays, present, extra, absent, onLeave }}
       />
     </div>
   );

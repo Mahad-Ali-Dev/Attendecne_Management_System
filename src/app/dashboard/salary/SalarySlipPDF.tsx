@@ -7,7 +7,8 @@ import type { Profile, SalarySlip } from "@/lib/types";
 export interface AttendanceSummary {
   workingDays: number;
   present: number;
-  late: number;
+  /** Rest days the employee worked anyway. */
+  extra: number;
   absent: number;
   onLeave: number;
 }
@@ -110,7 +111,7 @@ export function SalarySlipDocument({
           <Text style={styles.sectionTitle}>Attendance this month</Text>
           <Line label="Working days" value={attendanceSummary.workingDays} />
           <Line label="Present" value={attendanceSummary.present} />
-          <Line label="Late" value={attendanceSummary.late} />
+          <Line label="Extra days" value={attendanceSummary.extra} />
           <Line label="On leave" value={attendanceSummary.onLeave} />
           <Line label="Absent" value={attendanceSummary.absent} />
         </View>
