@@ -45,6 +45,10 @@ export function SalaryForm({
   const [allowances, setAllowances] = useState(seed ? String(seed.allowances) : "");
   // Deductions never carry forward — last month's shortfall has nothing to do with this one.
   const [deductions, setDeductions] = useState(existingSlip ? String(existingSlip.deductions) : "");
+  // A performance bonus is a per-month discretionary amount, so it doesn't carry forward either.
+  const [performanceBonus, setPerformanceBonus] = useState(
+    existingSlip ? String(existingSlip.performance_bonus ?? 0) : ""
+  );
   const [note, setNote] = useState(existingSlip?.note ?? "");
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -60,7 +64,8 @@ export function SalaryForm({
   const suggestedDeduction = autoDeduction(basicSalaryNum, summary.absentDays);
   const suggestedBonus = autoBonus(basicSalaryNum, summary.extraDays);
   const perDay = dailyRate(basicSalaryNum);
-  const netPay = basicSalaryNum + (Number(allowances) || 0) - (Number(deductions) || 0);
+  const netPay =
+    basicSalaryNum + (Number(allowances) || 0) + (Number(performanceBonus) || 0) - (Number(deductions) || 0);
   // Paid days (present + approved leave) as a share of the month's working days.
   const paidDays = summary.presentDays + summary.leaveDays;
   const workedRatio = summary.workingDays > 0 ? Math.min(100, (paidDays / summary.workingDays) * 100) : 100;
@@ -80,6 +85,7 @@ export function SalaryForm({
         month,
         basicSalaryNum,
         Number(allowances) || 0,
+        Number(performanceBonus) || 0,
         Number(deductions) || 0,
         note
       );
@@ -212,6 +218,17 @@ export function SalaryForm({
             step="1"
             value={allowances}
             onChange={(e) => setAllowances(e.target.value)}
+            className="input w-32"
+          />
+        </div>
+        <div>
+          <label className="label">Performance bonus</label>
+          <input
+            type="number"
+            min={0}
+            step="1"
+            value={performanceBonus}
+            onChange={(e) => setPerformanceBonus(e.target.value)}
             className="input w-32"
           />
         </div>

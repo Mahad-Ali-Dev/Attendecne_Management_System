@@ -102,6 +102,7 @@ create table if not exists public.salary_slips (
   month         date not null,  -- always the 1st of the month, e.g. 2026-09-01
   basic_salary  numeric(12,2) not null default 0,
   allowances    numeric(12,2) not null default 0,
+  performance_bonus numeric(12,2) not null default 0,
   deductions    numeric(12,2) not null default 0,
   note          text,
   created_at    timestamptz not null default now(),
@@ -109,6 +110,9 @@ create table if not exists public.salary_slips (
 );
 
 create index if not exists salary_slips_user_idx on public.salary_slips (user_id);
+
+-- Discretionary performance bonus, added later; adds to net pay like allowances.
+alter table public.salary_slips add column if not exists performance_bonus numeric(12,2) not null default 0;
 
 -- ---------------------------------------------------------------------------
 -- 2c. LEAVE REQUESTS  (employee-submitted, admin-reviewed)

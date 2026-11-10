@@ -57,6 +57,8 @@ export interface SalarySlip {
   month: string;
   basic_salary: number;
   allowances: number;
+  /** Discretionary performance bonus; adds to net pay like allowances. */
+  performance_bonus: number;
   deductions: number;
   note: string | null;
   created_at: string;

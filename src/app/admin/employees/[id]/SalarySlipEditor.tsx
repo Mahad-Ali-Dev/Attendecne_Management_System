@@ -10,8 +10,8 @@ import { summarizeMonth, leaveDatesSet } from "@/lib/payroll";
 import type { Attendance, LeaveRequest, SalarySlip } from "@/lib/types";
 import { Loader2, Pencil, Trash2 } from "lucide-react";
 
-function netPay(s: { basic_salary: number; allowances: number; deductions: number }) {
-  return s.basic_salary + s.allowances - s.deductions;
+function netPay(s: { basic_salary: number; allowances: number; performance_bonus: number; deductions: number }) {
+  return s.basic_salary + s.allowances + (s.performance_bonus ?? 0) - s.deductions;
 }
 
 export function SalarySlipEditor({
@@ -107,6 +107,7 @@ export function SalarySlipEditor({
               <th className="px-6 py-3 font-medium">Month</th>
               <th className="px-6 py-3 font-medium">Basic</th>
               <th className="px-6 py-3 font-medium">Allowances</th>
+              <th className="px-6 py-3 font-medium">Bonus</th>
               <th className="px-6 py-3 font-medium">Deductions</th>
               <th className="px-6 py-3 font-medium">Days vs target</th>
               <th className="px-6 py-3 font-medium">Net pay</th>
@@ -122,6 +123,7 @@ export function SalarySlipEditor({
                   <td className="px-6 py-3 font-medium text-navy">{formatMonthLabel(slipMonthKey)}</td>
                   <td className="px-6 py-3">{formatCurrency(s.basic_salary)}</td>
                   <td className="px-6 py-3">{formatCurrency(s.allowances)}</td>
+                  <td className="px-6 py-3">{formatCurrency(s.performance_bonus ?? 0)}</td>
                   <td className="px-6 py-3">{formatCurrency(s.deductions)}</td>
                   <td className="px-6 py-3">
                     {hist.absentDays > 0 ? (

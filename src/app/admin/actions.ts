@@ -17,6 +17,7 @@ export async function upsertSalarySlip(
   month: string,
   basicSalary: number,
   allowances: number,
+  performanceBonus: number,
   deductions: number,
   note: string
 ) {
@@ -24,7 +25,7 @@ export async function upsertSalarySlip(
   const supabase = createClient();
 
   if (!/^\d{4}-\d{2}$/.test(month)) return { error: "Pick a month." };
-  if ([basicSalary, allowances, deductions].some((n) => !Number.isFinite(n) || n < 0)) {
+  if ([basicSalary, allowances, performanceBonus, deductions].some((n) => !Number.isFinite(n) || n < 0)) {
     return { error: "Amounts must be zero or greater." };
   }
 
@@ -34,6 +35,7 @@ export async function upsertSalarySlip(
       month: `${month}-01`,
       basic_salary: basicSalary,
       allowances,
+      performance_bonus: performanceBonus,
       deductions,
       note: note.trim() || null,
     },

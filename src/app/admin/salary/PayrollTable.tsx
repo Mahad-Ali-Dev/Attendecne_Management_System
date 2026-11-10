@@ -11,8 +11,8 @@ import { formatCurrency, formatMonthLabel } from "@/lib/format";
 import type { Attendance, LeaveRequest, Profile, SalarySlip } from "@/lib/types";
 import { ChevronDown, ChevronUp, Loader2, Trash2 } from "lucide-react";
 
-function netPay(s: { basic_salary: number; allowances: number; deductions: number }) {
-  return s.basic_salary + s.allowances - s.deductions;
+function netPay(s: { basic_salary: number; allowances: number; performance_bonus: number; deductions: number }) {
+  return s.basic_salary + s.allowances + (s.performance_bonus ?? 0) - s.deductions;
 }
 
 export function PayrollTable({
@@ -99,6 +99,7 @@ export function PayrollTable({
             <th className="px-6 py-3 font-medium">Employee</th>
             <th className="px-6 py-3 font-medium">Basic</th>
             <th className="px-6 py-3 font-medium">Allowances</th>
+            <th className="px-6 py-3 font-medium">Bonus</th>
             <th className="px-6 py-3 font-medium">Deductions</th>
             <th className="px-6 py-3 font-medium">Net pay</th>
             <th className="px-6 py-3 font-medium">Status</th>
@@ -123,6 +124,7 @@ export function PayrollTable({
                   </td>
                   <td className="px-6 py-3">{slip ? formatCurrency(slip.basic_salary) : "—"}</td>
                   <td className="px-6 py-3">{slip ? formatCurrency(slip.allowances) : "—"}</td>
+                  <td className="px-6 py-3">{slip ? formatCurrency(slip.performance_bonus ?? 0) : "—"}</td>
                   <td className="px-6 py-3">{slip ? formatCurrency(slip.deductions) : "—"}</td>
                   <td className="px-6 py-3 font-semibold text-navy">{slip ? formatCurrency(netPay(slip)) : "—"}</td>
                   <td className="px-6 py-3">
@@ -159,7 +161,7 @@ export function PayrollTable({
                 </tr>
                 {isOpen && (
                   <tr>
-                    <td colSpan={7} className="bg-slate-50 px-6 py-5">
+                    <td colSpan={8} className="bg-slate-50 px-6 py-5">
                       <SalaryForm
                         employeeId={emp.id}
                         month={month}

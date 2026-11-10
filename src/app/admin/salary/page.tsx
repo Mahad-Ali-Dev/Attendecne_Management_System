@@ -43,7 +43,10 @@ export default async function AdminSalaryPage({
 
   const slipsThisMonth = slips.filter((s) => s.month.slice(0, 7) === monthKey);
   const paidCount = slipsThisMonth.length;
-  const totalPayroll = slipsThisMonth.reduce((sum, s) => sum + s.basic_salary + s.allowances - s.deductions, 0);
+  const totalPayroll = slipsThisMonth.reduce(
+    (sum, s) => sum + s.basic_salary + s.allowances + (s.performance_bonus ?? 0) - s.deductions,
+    0
+  );
 
   const monthLabel = formatMonthLabel(monthKey);
   const prevMonthKey = shiftMonthKey(monthKey, -1);

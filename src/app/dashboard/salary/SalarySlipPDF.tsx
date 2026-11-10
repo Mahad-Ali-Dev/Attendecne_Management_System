@@ -1,6 +1,6 @@
 "use client";
 
-import { Document, Page, View, Text, StyleSheet, PDFDownloadLink } from "@react-pdf/renderer";
+import { Document, Page, View, Text, Image, StyleSheet, PDFDownloadLink } from "@react-pdf/renderer";
 import { formatCurrency } from "@/lib/format";
 import type { Profile, SalarySlip } from "@/lib/types";
 
@@ -22,6 +22,8 @@ const styles = StyleSheet.create({
     borderBottom: "2 solid #0b1b2e",
     paddingBottom: 12,
   },
+  brand: { flexDirection: "row", alignItems: "center" },
+  logo: { width: 40, height: 40, marginRight: 10, objectFit: "contain" },
   company: { fontSize: 16, fontWeight: 700 },
   sub: { fontSize: 9, color: "#64748b", marginTop: 2 },
   title: { fontSize: 14, fontWeight: 700, textAlign: "right" },
@@ -77,14 +79,18 @@ export function SalarySlipDocument({
   monthLabel: string;
   attendanceSummary: AttendanceSummary;
 }) {
-  const netPay = slip.basic_salary + slip.allowances - slip.deductions;
+  const netPay = slip.basic_salary + slip.allowances + (slip.performance_bonus ?? 0) - slip.deductions;
   return (
     <Document>
       <Page size="A4" style={styles.page}>
         <View style={styles.header}>
-          <View>
-            <Text style={styles.company}>Evolut Ecommerce Solutions</Text>
-            <Text style={styles.sub}>Jhelum, Pakistan</Text>
+          <View style={styles.brand}>
+            {/* eslint-disable-next-line jsx-a11y/alt-text */}
+            <Image src="/logo.png" style={styles.logo} />
+            <View>
+              <Text style={styles.company}>Evolut Ecommerce Solutions</Text>
+              <Text style={styles.sub}>Jhelum, Pakistan</Text>
+            </View>
           </View>
           <View>
             <Text style={styles.title}>Salary Slip</Text>
@@ -120,6 +126,12 @@ export function SalarySlipDocument({
               <Text style={styles.label}>Allowances</Text>
               <Text style={styles.value}>{formatCurrency(slip.allowances)}</Text>
             </View>
+            {(slip.performance_bonus ?? 0) > 0 && (
+              <View style={styles.tableRow}>
+                <Text style={styles.label}>Performance bonus</Text>
+                <Text style={styles.value}>{formatCurrency(slip.performance_bonus ?? 0)}</Text>
+              </View>
+            )}
             <View style={styles.tableRow}>
               <Text style={styles.label}>Deductions</Text>
               <Text style={styles.value}>-{formatCurrency(slip.deductions)}</Text>
