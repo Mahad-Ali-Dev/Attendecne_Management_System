@@ -45,10 +45,16 @@ export function TicketsAgentList({
   rows,
   monthLabel,
   monthKey,
+  editable = true,
+  profileBasePath = "/admin/employees",
 }: {
   rows: AgentTicketRow[];
   monthLabel: string;
   monthKey: string;
+  /** Show the admin add / edit / delete controls. Off for a read-only (team-lead) view. */
+  editable?: boolean;
+  /** Base path for "Open full profile" — link is `{base}/{id}?month=…`. Defaults to the admin employee page. */
+  profileBasePath?: string;
 }) {
   const router = useRouter();
   const [openId, setOpenId] = useState<string | null>(null);
@@ -59,6 +65,7 @@ export function TicketsAgentList({
   const [saving, startSave] = useTransition();
   const [deleting, startDelete] = useTransition();
   const monthShort = monthLabel.split(" ")[0];
+  const linkFor = (id: string) => `${profileBasePath}/${id}?month=${monthKey}`;
 
   function openEdit(agent: AgentTicketRow, date: string, count: number) {
     setEdit({ agentId: agent.id, agentName: agent.name, date, count: count ? String(count) : "" });
@@ -144,7 +151,7 @@ export function TicketsAgentList({
                 <div className="mb-3 flex items-center justify-between">
                   <h4 className="text-sm font-semibold text-navy">Daily tickets · {monthLabel}</h4>
                   <Link
-                    href={`/admin/employees/${row.id}?month=${monthKey}`}
+                    href={linkFor(row.id)}
                     className="inline-flex items-center gap-1 text-xs font-medium text-brand-600 hover:underline"
                   >
                     Open full profile <ExternalLink className="h-3 w-3" />
@@ -159,7 +166,7 @@ export function TicketsAgentList({
                         <tr>
                           <th className="px-4 py-2.5 font-medium">Date</th>
                           <th className="px-4 py-2.5 text-right font-medium">Tickets solved</th>
-                          <th className="px-4 py-2.5 font-medium"></th>
+                          {editable && <th className="px-4 py-2.5 font-medium"></th>}
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-50">
@@ -173,43 +180,45 @@ export function TicketsAgentList({
                             >
                               {d.count || "—"}
                             </td>
-                            <td className="px-4 py-2.5">
-                              <div className="flex items-center justify-end gap-1">
-                                {d.count ? (
-                                  <>
+                            {editable && (
+                              <td className="px-4 py-2.5">
+                                <div className="flex items-center justify-end gap-1">
+                                  {d.count ? (
+                                    <>
+                                      <button
+                                        onClick={() => openEdit(row, d.date, d.count)}
+                                        aria-label={`Edit ${d.date}`}
+                                        className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-navy"
+                                      >
+                                        <Pencil className="h-3.5 w-3.5" />
+                                      </button>
+                                      <button
+                                        onClick={() => {
+                                          setDel({
+                                            agentId: row.id,
+                                            agentName: row.name,
+                                            date: d.date,
+                                            count: d.count,
+                                          });
+                                          setDelError(null);
+                                        }}
+                                        aria-label={`Delete ${d.date}`}
+                                        className="rounded-lg p-1.5 text-slate-400 transition hover:bg-red-50 hover:text-red-600"
+                                      >
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                      </button>
+                                    </>
+                                  ) : (
                                     <button
-                                      onClick={() => openEdit(row, d.date, d.count)}
-                                      aria-label={`Edit ${d.date}`}
-                                      className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-navy"
+                                      onClick={() => openEdit(row, d.date, 0)}
+                                      className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-brand-600 transition hover:bg-brand-50"
                                     >
-                                      <Pencil className="h-3.5 w-3.5" />
+                                      <Plus className="h-3 w-3" /> Add
                                     </button>
-                                    <button
-                                      onClick={() => {
-                                        setDel({
-                                          agentId: row.id,
-                                          agentName: row.name,
-                                          date: d.date,
-                                          count: d.count,
-                                        });
-                                        setDelError(null);
-                                      }}
-                                      aria-label={`Delete ${d.date}`}
-                                      className="rounded-lg p-1.5 text-slate-400 transition hover:bg-red-50 hover:text-red-600"
-                                    >
-                                      <Trash2 className="h-3.5 w-3.5" />
-                                    </button>
-                                  </>
-                                ) : (
-                                  <button
-                                    onClick={() => openEdit(row, d.date, 0)}
-                                    className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-brand-600 transition hover:bg-brand-50"
-                                  >
-                                    <Plus className="h-3 w-3" /> Add
-                                  </button>
-                                )}
-                              </div>
-                            </td>
+                                  )}
+                                </div>
+                              </td>
+                            )}
                           </tr>
                         ))}
                       </tbody>
@@ -217,7 +226,7 @@ export function TicketsAgentList({
                         <tr>
                           <td className="px-4 py-2.5">{monthShort} total</td>
                           <td className="px-4 py-2.5 text-right tabular-nums text-brand-600">{row.monthTotal}</td>
-                          <td className="px-4 py-2.5"></td>
+                          {editable && <td className="px-4 py-2.5"></td>}
                         </tr>
                       </tfoot>
                     </table>

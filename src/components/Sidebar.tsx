@@ -49,14 +49,20 @@ function navItems(isAdmin: boolean, isSupport: boolean, isTeamLead: boolean) {
   }
   return [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-    // Team leads get a view of their own team, on top of their personal screens.
-    ...(isTeamLead ? [{ href: "/dashboard/team", label: "My Team", icon: Users }] : []),
+    // Team leads get a view of their own team, plus a read-only team-tickets
+    // report (they don't solve tickets, so no personal ticket log).
+    ...(isTeamLead
+      ? [
+          { href: "/dashboard/team", label: "My Team", icon: Users },
+          { href: "/dashboard/team/tickets", label: "Team tickets", icon: Ticket },
+        ]
+      : []),
     { href: "/dashboard/hours", label: "Monthly Hours", icon: BarChart3 },
     { href: "/dashboard/productivity", label: "Productivity", icon: Activity },
     { href: "/dashboard/salary", label: "Salary Slip", icon: Wallet },
     { href: "/dashboard/leave", label: "Leave", icon: CalendarOff },
-    // Only customer-support agents log tickets.
-    ...(isSupport ? [{ href: "/dashboard/tickets", label: "Tickets", icon: Ticket }] : []),
+    // Only customer-support agents who aren't team leads log their own tickets.
+    ...(isSupport && !isTeamLead ? [{ href: "/dashboard/tickets", label: "Tickets", icon: Ticket }] : []),
     { href: "/dashboard/support", label: "Support", icon: LifeBuoy },
     { href: "/dashboard/downloads", label: "Tracker", icon: Download },
   ];

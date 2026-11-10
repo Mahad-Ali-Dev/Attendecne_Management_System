@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { reviewLeaveRequest } from "../actions";
 import { Avatar } from "@/components/Avatar";
 import { LeaveDetailModal } from "@/components/LeaveDetailModal";
-import { LEAVE_STATUS_STYLE, titleCase } from "@/lib/leave";
+import { LEAVE_STATUS_STYLE, leaveDayCount, titleCase } from "@/lib/leave";
 import { formatDate } from "@/lib/format";
 import type { LeaveRequest, LeaveStatus, Profile } from "@/lib/types";
 import { Check, X, Loader2 } from "lucide-react";
@@ -72,6 +72,7 @@ export function LeaveReviewTable({
           {sorted.map((r) => {
             const emp = employeeById.get(r.user_id);
             const busy = pending && actingId === r.id;
+            const days = leaveDayCount(r.start_date, r.end_date);
             return (
               <tr
                 key={r.id}
@@ -84,9 +85,12 @@ export function LeaveReviewTable({
                     <div className="font-medium text-navy">{emp?.full_name ?? "Unknown"}</div>
                   </div>
                 </td>
-                <td className="px-6 py-3">
+                <td className="whitespace-nowrap px-6 py-3">
                   {formatDate(r.start_date)}
                   {r.start_date !== r.end_date ? ` – ${formatDate(r.end_date)}` : ""}
+                  <span className="ml-1 text-slate-400">
+                    · {days} {days === 1 ? "day" : "days"}
+                  </span>
                 </td>
                 <td className="px-6 py-3">{titleCase(r.leave_type)}</td>
                 <td className="max-w-xs truncate px-6 py-3 text-slate-500">{r.reason || "—"}</td>

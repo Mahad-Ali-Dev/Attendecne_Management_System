@@ -54,11 +54,14 @@ export default async function DashboardPage() {
     today
   );
 
-  // Support agents log the day's tickets before they can check out — the gate
-  // is scoped to the open shift's work day (handles overnight shifts).
+  // A customer-support agent logs the day's tickets before they can check out —
+  // the gate is scoped to the open shift's work day (handles overnight shifts).
+  // A team lead is exempt even when flagged as support: they manage the team,
+  // they don't solve tickets, so they get neither the gate nor the log widget.
+  const isSupportAgent = profile.is_support && profile.role !== "TEAM_LEAD";
   const ticketDate = todayRecord?.work_date ?? today;
   let todayTickets: number | null = null;
-  if (profile.is_support) {
+  if (isSupportAgent) {
     const { data: tr } = await supabase
       .from("ticket_reports")
       .select("tickets_solved")
@@ -68,7 +71,7 @@ export default async function DashboardPage() {
     todayTickets = tr ? (tr.tickets_solved as number) : null;
   }
   const blockCheckout =
-    profile.is_support && !!todayRecord?.check_in && !todayRecord?.check_out && todayTickets === null;
+    isSupportAgent && !!todayRecord?.check_in && !todayRecord?.check_out && todayTickets === null;
 
   return (
     <div className="space-y-8">
@@ -82,7 +85,7 @@ export default async function DashboardPage() {
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
           <AttendanceWidget today={todayRecord} blockCheckout={blockCheckout} />
-          {profile.is_support && (
+          {isSupportAgent && (
             <DashboardTicketLog
               workDate={ticketDate}
               loggedCount={todayTickets}

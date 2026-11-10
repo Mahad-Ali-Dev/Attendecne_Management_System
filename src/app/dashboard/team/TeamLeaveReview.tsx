@@ -4,7 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { reviewLeaveAsLead } from "./actions";
 import { Avatar } from "@/components/Avatar";
-import { LEAVE_STATUS_STYLE, titleCase } from "@/lib/leave";
+import { LEAVE_STATUS_STYLE, leaveDayCount, titleCase } from "@/lib/leave";
 import { formatDate } from "@/lib/format";
 import type { LeaveRequest, Profile } from "@/lib/types";
 import { Check, X, Loader2, CalendarClock } from "lucide-react";
@@ -65,6 +65,7 @@ export function TeamLeaveReview({ requests, members }: { requests: LeaveRequest[
               const m = byId.get(r.user_id);
               const busy = pending && actingId === r.id;
               const canAct = r.lead_status === null || r.lead_status === "PENDING";
+              const days = leaveDayCount(r.start_date, r.end_date);
               return (
                 <tr key={r.id} className="text-slate-600">
                   <td className="px-6 py-3">
@@ -79,6 +80,9 @@ export function TeamLeaveReview({ requests, members }: { requests: LeaveRequest[
                   <td className="whitespace-nowrap px-6 py-3">
                     {formatDate(r.start_date)}
                     {r.start_date !== r.end_date ? ` – ${formatDate(r.end_date)}` : ""}
+                    <span className="ml-1 text-slate-400">
+                      · {days} {days === 1 ? "day" : "days"}
+                    </span>
                   </td>
                   <td className="px-6 py-3">{titleCase(r.leave_type)}</td>
                   <td className="max-w-xs truncate px-6 py-3 text-slate-500" title={r.reason || ""}>

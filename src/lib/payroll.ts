@@ -96,26 +96,33 @@ export function summarizeMonth(
   return { workingDays, leaveDays, presentDays, absentDays, extraDays, expectedHours, actualHours, hoursShort, hoursExtra };
 }
 
-/** A single day's pay: basic salary spread evenly across the month's working days. */
-export function dailyRate(basicSalary: number, workingDays: number): number {
-  return workingDays > 0 ? basicSalary / workingDays : 0;
-}
-
 /**
- * Deducts a full day's pay for each working day the employee missed. Basic
- * salary is spread evenly across the month's working days, so one absent day
- * costs one day's pay. Approved leave is paid and never counted as absent.
+ * Company payroll convention: a month's basic salary is always divided by a
+ * flat 30 days to get the day rate, regardless of how many working days the
+ * month actually has. So a full month pays the full basic, and each absent day
+ * costs basic / 30 (not basic / working-days).
  */
-export function autoDeduction(basicSalary: number, workingDays: number, absentDays: number): number {
-  if (workingDays <= 0 || absentDays <= 0) return 0;
-  return Math.round(absentDays * dailyRate(basicSalary, workingDays));
+export const PAYROLL_DAYS_PER_MONTH = 30;
+
+/** A single day's pay: basic salary divided by the flat 30-day month. */
+export function dailyRate(basicSalary: number): number {
+  return basicSalary / PAYROLL_DAYS_PER_MONTH;
 }
 
 /**
- * Bonus of one day's pay for each rest day worked — the mirror of
+ * Deducts a day's pay (basic / 30) for each working day the employee missed.
+ * Approved leave is paid and never counted as absent.
+ */
+export function autoDeduction(basicSalary: number, absentDays: number): number {
+  if (absentDays <= 0) return 0;
+  return Math.round(absentDays * dailyRate(basicSalary));
+}
+
+/**
+ * Bonus of a day's pay (basic / 30) for each rest day worked — the mirror of
  * autoDeduction, using the same per-day rate.
  */
-export function autoBonus(basicSalary: number, workingDays: number, extraDays: number): number {
-  if (workingDays <= 0 || extraDays <= 0) return 0;
-  return Math.round(extraDays * dailyRate(basicSalary, workingDays));
+export function autoBonus(basicSalary: number, extraDays: number): number {
+  if (extraDays <= 0) return 0;
+  return Math.round(extraDays * dailyRate(basicSalary));
 }

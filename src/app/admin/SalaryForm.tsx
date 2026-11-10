@@ -57,17 +57,18 @@ export function SalaryForm({
   );
 
   const basicSalaryNum = Number(basicSalary) || 0;
-  const suggestedDeduction = autoDeduction(basicSalaryNum, summary.workingDays, summary.absentDays);
-  const suggestedBonus = autoBonus(basicSalaryNum, summary.workingDays, summary.extraDays);
-  const perDay = dailyRate(basicSalaryNum, summary.workingDays);
+  const suggestedDeduction = autoDeduction(basicSalaryNum, summary.absentDays);
+  const suggestedBonus = autoBonus(basicSalaryNum, summary.extraDays);
+  const perDay = dailyRate(basicSalaryNum);
   const netPay = basicSalaryNum + (Number(allowances) || 0) - (Number(deductions) || 0);
   // Paid days (present + approved leave) as a share of the month's working days.
   const paidDays = summary.presentDays + summary.leaveDays;
   const workedRatio = summary.workingDays > 0 ? Math.min(100, (paidDays / summary.workingDays) * 100) : 100;
-  // The same "Paid working days" the Reports tab shows (present + extra + leave),
-  // and the pay it works out to at the per-day rate.
+  // The same "Paid working days" the Reports tab shows (present + extra + leave).
   const paidWorkingDays = summary.presentDays + summary.leaveDays + summary.extraDays;
-  const suggestedNet = Math.round(paidWorkingDays * perDay);
+  // Full basic for the month, less a day's pay (basic ÷ 30) per absent day, plus
+  // a day's pay per extra rest-day worked.
+  const suggestedNet = Math.round(basicSalaryNum - suggestedDeduction + suggestedBonus);
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -133,9 +134,15 @@ export function SalaryForm({
 
         {basicSalaryNum > 0 && (
           <div className="mt-3 rounded-lg border border-brand-100 bg-brand-50/70 px-3 py-2.5 text-xs text-brand-700">
-            <span className="font-semibold">{paidWorkingDays} paid working days</span> (present + leave + extra) ×{" "}
-            {formatCurrency(perDay)}/day ≈{" "}
-            <span className="font-semibold">{formatCurrency(suggestedNet)}</span> suggested net pay
+            Day rate <span className="font-semibold">{formatCurrency(perDay)}</span> (salary ÷ 30 days). Suggested
+            net ≈ <span className="font-semibold">{formatCurrency(suggestedNet)}</span>
+            {summary.absentDays > 0 || summary.extraDays > 0 ? (
+              <>
+                {" "}
+                (basic{summary.absentDays > 0 ? ` − ${summary.absentDays} absent` : ""}
+                {summary.extraDays > 0 ? ` + ${summary.extraDays} extra` : ""})
+              </>
+            ) : null}
           </div>
         )}
 

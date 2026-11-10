@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { requestLeave, cancelLeaveRequest } from "./actions";
 import { formatDate } from "@/lib/format";
+import { leaveDayCount } from "@/lib/leave";
 import type { LeaveRequest, LeaveType } from "@/lib/types";
 import { Loader2, X } from "lucide-react";
 
@@ -62,6 +63,8 @@ export function LeaveRequestForm({ requests }: { requests: LeaveRequest[] }) {
     });
   }
 
+  const days = startDate && endDate && endDate >= startDate ? leaveDayCount(startDate, endDate) : null;
+
   return (
     <>
       <div className="card p-6">
@@ -74,7 +77,13 @@ export function LeaveRequestForm({ requests }: { requests: LeaveRequest[] }) {
                 type="date"
                 required
                 value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setStartDate(v);
+                  // Default to a single day: only keep an end date that's still
+                  // on or after the new start, otherwise snap it to the start.
+                  if (!endDate || endDate < v) setEndDate(v);
+                }}
                 className="input"
               />
             </div>
@@ -104,6 +113,15 @@ export function LeaveRequestForm({ requests }: { requests: LeaveRequest[] }) {
               </select>
             </div>
           </div>
+          {days !== null && (
+            <p className="-mt-1 text-xs text-slate-500">
+              This request covers{" "}
+              <span className="font-semibold text-navy">
+                {days} {days === 1 ? "day" : "days"}
+              </span>
+              . For a single day, keep the start and end date the same.
+            </p>
+          )}
           <div>
             <label className="label">Reason (optional)</label>
             <textarea
@@ -140,11 +158,16 @@ export function LeaveRequestForm({ requests }: { requests: LeaveRequest[] }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
-              {requests.map((r) => (
+              {requests.map((r) => {
+                const d = leaveDayCount(r.start_date, r.end_date);
+                return (
                 <tr key={r.id} className="text-slate-600">
                   <td className="px-6 py-3 font-medium text-navy">
                     {formatDate(r.start_date)}
                     {r.start_date !== r.end_date ? ` – ${formatDate(r.end_date)}` : ""}
+                    <span className="ml-1 font-normal text-slate-400">
+                      · {d} {d === 1 ? "day" : "days"}
+                    </span>
                   </td>
                   <td className="px-6 py-3">{titleCase(r.leave_type)}</td>
                   <td className="max-w-xs truncate px-6 py-3 text-slate-500">{r.reason || "—"}</td>
@@ -167,7 +190,8 @@ export function LeaveRequestForm({ requests }: { requests: LeaveRequest[] }) {
                     )}
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         )}

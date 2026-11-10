@@ -151,10 +151,12 @@ export async function checkOut() {
   if (!openRecord) return { error: "You haven't checked in yet." };
 
   // A customer-support agent must log the day's tickets before closing the
-  // shift, so the ticket report is never skipped. Scoped to the shift's own
-  // work_date so an overnight shift checks the day it started, not "now".
-  const { data: profile } = await supabase.from("profiles").select("is_support").eq("id", user.id).single();
-  if (profile?.is_support) {
+  // shift, so the ticket report is never skipped. A team lead is exempt even
+  // when flagged as support — they manage the team, they don't solve tickets.
+  // Scoped to the shift's own work_date so an overnight shift checks the day it
+  // started, not "now".
+  const { data: profile } = await supabase.from("profiles").select("is_support, role").eq("id", user.id).single();
+  if (profile?.is_support && profile.role !== "TEAM_LEAD") {
     const { data: ticket } = await supabase
       .from("ticket_reports")
       .select("id")
