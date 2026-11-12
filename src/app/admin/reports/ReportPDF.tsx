@@ -11,8 +11,11 @@ Font.registerHyphenationCallback((word) => [word]);
 // item, in the same order, and NAME_WIDTH + these sum to 100. Keep this list
 // the same length as REPORT_COLUMNS — a missing entry leaves a column with no
 // width.
-const NAME_WIDTH = 17;
-const COLUMN_WIDTHS = [6, 6, 5.5, 5.5, 5.5, 5.5, 4.5, 4.5, 4.5, 4, 4.5, 5, 5, 5.5, 6, 5.5];
+// A narrower name column leaves more room for the 16 data columns, so the
+// headings (several are long single words — Productive, Unproductive,
+// Attendance) each get enough width to stay readable instead of crowding.
+const NAME_WIDTH = 12;
+const COLUMN_WIDTHS = [5.5, 5.5, 5.5, 5.5, 7, 7, 5, 5, 5, 4.5, 5, 5, 5, 5, 7, 5.5];
 
 const styles = StyleSheet.create({
   page: { paddingTop: 28, paddingHorizontal: 28, paddingBottom: 44, fontSize: 8, fontFamily: "Helvetica", color: "#0b1b2e" },
@@ -28,13 +31,14 @@ const styles = StyleSheet.create({
   sub: { fontSize: 9, color: "#64748b", marginTop: 2 },
   title: { fontSize: 14, fontWeight: 700, textAlign: "right" },
   headRow: { flexDirection: "row", backgroundColor: "#f1f5f9", paddingVertical: 5, paddingHorizontal: 4 },
-  headCell: { fontSize: 7, color: "#64748b", textTransform: "uppercase", textAlign: "right" },
+  // paddingLeft keeps a small gap so a wide heading never touches its neighbour.
+  headCell: { fontSize: 7, color: "#64748b", textTransform: "uppercase", textAlign: "right", paddingLeft: 3 },
   strongHead: { color: "#0b1b2e", fontWeight: 700 },
   strongCell: { fontWeight: 700 },
   row: { flexDirection: "row", paddingVertical: 4, paddingHorizontal: 4, borderBottom: "1 solid #f1f5f9", alignItems: "center" },
   name: { fontWeight: 700 },
   dept: { fontSize: 7, color: "#94a3b8", marginTop: 1 },
-  num: { textAlign: "right" },
+  num: { textAlign: "right", paddingLeft: 3 },
   note: { marginTop: 12, fontSize: 7, color: "#94a3b8" },
   footer: {
     position: "absolute",
