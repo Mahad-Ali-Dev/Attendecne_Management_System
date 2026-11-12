@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireAdmin } from "@/lib/data";
 import { notifyUser } from "@/lib/notify";
 import { formatDate } from "@/lib/format";
+import { leaveDatesInRange } from "@/lib/leave";
 
 /**
  * Admin creates or edits an employee's salary slip for a given month
@@ -48,36 +49,59 @@ export async function upsertSalarySlip(
   return { ok: true };
 }
 
-/** Admin approves or rejects a leave request. */
-export async function reviewLeaveRequest(requestId: string, approve: boolean) {
+/**
+ * Admin approves or rejects a leave request. `approvedDates` lets the admin
+ * approve only part of a multi-day request — only those dates count as paid
+ * leave, and the rest of the range falls through to absent. Omit it (or pass
+ * the whole range) for a normal full approval, which stores NULL so the whole
+ * range reads as approved.
+ */
+export async function reviewLeaveRequest(requestId: string, approve: boolean, approvedDates?: string[]) {
   const admin = await requireAdmin();
   const supabase = createClient();
 
-  const { data, error } = await supabase
+  const { data: req, error: findErr } = await supabase
+    .from("leave_requests")
+    .select("user_id, start_date, end_date")
+    .eq("id", requestId)
+    .maybeSingle();
+  if (findErr) return { error: findErr.message };
+  if (!req) return { error: "Leave request not found." };
+
+  const rangeDates = leaveDatesInRange(req.start_date, req.end_date);
+  let approvedCol: string[] | null = null;
+  if (approve && approvedDates && approvedDates.length > 0) {
+    const inRange = new Set(rangeDates);
+    const chosen = Array.from(new Set(approvedDates.filter((d) => inRange.has(d)))).sort();
+    if (chosen.length === 0) return { error: "Pick at least one day to approve, or reject the request." };
+    // Every day chosen is a full approval — store NULL so it reads as the whole range.
+    approvedCol = chosen.length === rangeDates.length ? null : chosen;
+  }
+
+  const { error } = await supabase
     .from("leave_requests")
     .update({
       status: approve ? "APPROVED" : "REJECTED",
       reviewed_by: admin.id,
       reviewed_at: new Date().toISOString(),
+      approved_dates: approve ? approvedCol : null,
     })
-    .eq("id", requestId)
-    .select("user_id, start_date, end_date")
-    .single();
-
+    .eq("id", requestId);
   if (error) return { error: error.message };
 
-  if (data) {
-    await notifyUser(
-      data.user_id,
-      approve ? "LEAVE_APPROVED" : "LEAVE_REJECTED",
-      `Your leave request for ${formatDate(data.start_date)} – ${formatDate(data.end_date)} was ${
-        approve ? "approved" : "rejected"
-      }.`,
-      "/dashboard/leave"
-    );
-  }
+  const range = `${formatDate(req.start_date)} – ${formatDate(req.end_date)}`;
+  const message = !approve
+    ? `Your leave request for ${range} was rejected.`
+    : approvedCol
+      ? `Your leave was partly approved: ${approvedCol.length} of ${rangeDates.length} days (${range}) are paid; the other days count as absent.`
+      : `Your leave request for ${range} was approved.`;
+  await notifyUser(req.user_id, approve ? "LEAVE_APPROVED" : "LEAVE_REJECTED", message, "/dashboard/leave");
 
+  // Approval feeds attendance, payroll and the reports, so refresh those too.
   revalidatePath("/admin/leave");
+  revalidatePath(`/admin/employees/${req.user_id}`);
+  revalidatePath("/admin/salary");
+  revalidatePath("/admin/reports");
   return { ok: true };
 }
 

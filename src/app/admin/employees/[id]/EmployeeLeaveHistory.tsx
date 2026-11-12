@@ -24,10 +24,10 @@ export function EmployeeLeaveHistory({
 
   const approvedCount = requests.filter((r) => r.status === "APPROVED").length;
 
-  function act(id: string, approve: boolean) {
+  function act(id: string, approve: boolean, approvedDates?: string[]) {
     setActingId(id);
     startTransition(async () => {
-      await reviewLeaveRequest(id, approve);
+      await reviewLeaveRequest(id, approve, approvedDates);
       setActingId(null);
       setViewing(null);
       router.refresh();
@@ -128,7 +128,7 @@ export function EmployeeLeaveHistory({
         <LeaveDetailModal
           request={viewing}
           onClose={() => setViewing(null)}
-          onReview={(approve) => act(viewing.id, approve)}
+          onReview={(approve, approvedDates) => act(viewing.id, approve, approvedDates)}
           busy={pending && actingId === viewing.id}
         />
       )}

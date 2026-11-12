@@ -81,6 +81,8 @@ export interface LeaveRequest {
   lead_status: LeaveStatus | null;
   lead_reviewed_by: string | null;
   lead_reviewed_at: string | null;
+  /** Dates (YYYY-MM-DD) approved as paid leave; null = the whole range. Dates in range but not here count as absent. */
+  approved_dates: string[] | null;
   created_at: string;
 }
 

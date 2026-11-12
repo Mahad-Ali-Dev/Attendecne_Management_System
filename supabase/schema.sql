@@ -135,6 +135,11 @@ create table if not exists public.leave_requests (
   lead_status      text check (lead_status in ('PENDING', 'APPROVED', 'REJECTED')),
   lead_reviewed_by uuid references public.profiles (id),
   lead_reviewed_at timestamptz,
+  -- When an admin approves only part of a multi-day request, the exact dates
+  -- they approved as paid leave. NULL means the whole range is approved (the
+  -- default for a full approval and for older rows). Any date in the request's
+  -- range that is NOT listed here is not excused, so it counts as absent.
+  approved_dates   date[],
   created_at   timestamptz not null default now(),
   check (end_date >= start_date)
 );
@@ -147,6 +152,8 @@ alter table public.leave_requests add column if not exists lead_status text
   check (lead_status in ('PENDING', 'APPROVED', 'REJECTED'));
 alter table public.leave_requests add column if not exists lead_reviewed_by uuid references public.profiles (id);
 alter table public.leave_requests add column if not exists lead_reviewed_at timestamptz;
+-- Partial-approval support: the specific dates an admin approved as paid leave.
+alter table public.leave_requests add column if not exists approved_dates date[];
 
 -- ---------------------------------------------------------------------------
 -- 2d. NOTIFICATIONS  (in-app alerts — leave requested / approved / rejected)

@@ -15,3 +15,12 @@ export function titleCase(value: string): string {
 export function leaveDayCount(startDate: string, endDate: string): number {
   return Math.round((Date.parse(`${endDate}T00:00:00Z`) - Date.parse(`${startDate}T00:00:00Z`)) / 86_400_000) + 1;
 }
+
+/** Every calendar date (YYYY-MM-DD) a leave covers, inclusive of both ends. */
+export function leaveDatesInRange(startDate: string, endDate: string): string[] {
+  const out: string[] = [];
+  for (let t = Date.parse(`${startDate}T00:00:00Z`); t <= Date.parse(`${endDate}T00:00:00Z`); t += 86_400_000) {
+    out.push(new Date(t).toISOString().slice(0, 10));
+  }
+  return out;
+}

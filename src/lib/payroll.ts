@@ -24,6 +24,12 @@ export function leaveDatesSet(leaveRequests: LeaveRequest[]): Set<string> {
   const dates = new Set<string>();
   for (const lr of leaveRequests) {
     if (lr.status !== "APPROVED") continue;
+    // Partial approval: only the admin-approved dates are paid leave; the other
+    // days in the range are not excused (they fall through to absent).
+    if (lr.approved_dates && lr.approved_dates.length > 0) {
+      for (const d of lr.approved_dates) dates.add(d.slice(0, 10));
+      continue;
+    }
     for (let t = Date.parse(`${lr.start_date}T00:00:00Z`); t <= Date.parse(`${lr.end_date}T00:00:00Z`); t += 86_400_000) {
       dates.add(new Date(t).toISOString().slice(0, 10));
     }
