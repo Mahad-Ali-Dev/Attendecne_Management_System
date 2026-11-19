@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Avatar } from "@/components/Avatar";
@@ -67,6 +67,12 @@ export function TicketsAgentList({
   const monthShort = monthLabel.split(" ")[0];
   const linkFor = (id: string) => `${profileBasePath}/${id}?month=${monthKey}`;
 
+  // Busiest first: the agent with the most tickets this month ranks #1.
+  const sorted = useMemo(
+    () => [...rows].sort((a, b) => b.monthTotal - a.monthTotal || a.name.localeCompare(b.name)),
+    [rows]
+  );
+
   function openEdit(agent: AgentTicketRow, date: string, count: number) {
     setEdit({ agentId: agent.id, agentName: agent.name, date, count: count ? String(count) : "" });
     setError(null);
@@ -108,14 +114,19 @@ export function TicketsAgentList({
     <div className="card divide-y divide-slate-100 overflow-hidden">
       {/* Column labels (wide screens only) */}
       <div className="hidden items-center gap-4 bg-slate-50 px-6 py-3 text-xs font-medium uppercase tracking-wide text-slate-400 sm:flex">
+        <span className="w-6 text-center">#</span>
         <span className="flex-1">Agent</span>
+        <span className="w-20 text-right">Avg / day</span>
         <span className="w-28 text-right">{monthShort} total</span>
         <span className="w-24 text-right">All time</span>
         <span className="w-5" />
       </div>
 
-      {rows.map((row) => {
+      {sorted.map((row, i) => {
         const isOpen = openId === row.id;
+        // Average over the days the agent actually logged tickets this month.
+        const loggedDays = row.days.filter((d) => d.count > 0).length;
+        const avgPerDay = loggedDays > 0 ? (row.monthTotal / loggedDays).toFixed(1) : "—";
         return (
           <div key={row.id}>
             <button
@@ -124,10 +135,17 @@ export function TicketsAgentList({
               aria-expanded={isOpen}
               className="flex w-full items-center gap-4 px-6 py-4 text-left text-sm transition hover:bg-slate-50"
             >
+              <span className="w-6 shrink-0 text-center text-sm font-semibold text-slate-400">{i + 1}</span>
               <Avatar name={row.name} src={row.avatarUrl} size={30} />
               <div className="min-w-0 flex-1">
                 <div className="truncate font-medium text-navy">{row.name}</div>
                 <div className="truncate text-xs text-slate-400">{row.position || "Support"}</div>
+              </div>
+              <div className="w-20 text-right">
+                <div className="font-semibold tabular-nums text-navy">{avgPerDay}</div>
+                <div className="text-[10px] font-medium uppercase tracking-wide text-slate-400 sm:hidden">
+                  Avg / day
+                </div>
               </div>
               <div className="w-28 text-right">
                 <div className="font-semibold tabular-nums text-brand-600">{row.monthTotal}</div>
