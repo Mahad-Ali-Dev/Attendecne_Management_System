@@ -37,11 +37,14 @@ function groupByUser<T extends { user_id: string }>(
   return map;
 }
 
-// A `strong` column (see REPORT_COLUMNS) is drawn bold so it stands out.
+// A `strong` column (see REPORT_COLUMNS) is drawn bold so it stands out. Headers
+// bottom-align so one- and two-line titles line up neatly above the data, and a
+// per-column min width keeps a long single word (e.g. "Unproductive") from being
+// squeezed.
 const headClass = (strong?: boolean) =>
-  `px-3 py-3 text-right font-medium leading-tight${strong ? " text-navy" : ""}`;
+  `min-w-[4.75rem] px-3 py-3 text-right align-bottom font-medium leading-tight${strong ? " text-navy" : ""}`;
 const cellClass = (strong?: boolean) =>
-  `whitespace-nowrap px-3 py-3 text-right tabular-nums${strong ? " font-semibold text-navy" : ""}`;
+  `min-w-[4.75rem] whitespace-nowrap px-3 py-3 text-right tabular-nums${strong ? " font-semibold text-navy" : ""}`;
 
 export default async function AdminReportsPage({
   searchParams,
@@ -205,10 +208,10 @@ export default async function AdminReportsPage({
       ) : (
         <div className="card overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1680px] text-sm">
-              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-400">
+            <table className="w-full min-w-[1820px] text-sm">
+              <thead className="bg-slate-50 text-xs uppercase text-slate-400">
                 <tr>
-                  <th className="sticky left-0 z-10 min-w-[13rem] bg-slate-50 px-6 py-3 text-left font-medium">
+                  <th className="sticky left-0 z-10 min-w-[13rem] bg-slate-50 px-6 py-3 text-left align-bottom font-medium">
                     Employee
                   </th>
                   {REPORT_COLUMNS.map((col) => (
