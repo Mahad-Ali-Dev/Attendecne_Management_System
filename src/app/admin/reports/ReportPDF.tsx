@@ -15,7 +15,7 @@ Font.registerHyphenationCallback((word) => [word]);
 // headings (several are long single words — Productive, Unproductive,
 // Attendance) each get enough width to stay readable instead of crowding.
 const NAME_WIDTH = 12;
-const COLUMN_WIDTHS = [5.5, 5.5, 5.5, 5.5, 7, 7, 5, 5, 5, 4.5, 5, 5, 5, 5, 7, 5.5];
+const COLUMN_WIDTHS = [5.5, 5.5, 5.5, 5, 6, 6.5, 5, 4.5, 4.5, 4.5, 4.5, 5, 5, 4.5, 5, 6, 5.5];
 
 const styles = StyleSheet.create({
   page: { paddingTop: 28, paddingHorizontal: 28, paddingBottom: 44, fontSize: 8, fontFamily: "Helvetica", color: "#0b1b2e" },
@@ -117,7 +117,8 @@ export function ReportDocument({
           Rest days are excluded throughout. Required days are the month&apos;s working days (approved leave included);
           Required hours exclude approved leave. Extra days are rest days the employee worked. Total days worked =
           Present + Extra days. Paid working days = Present + Extra days + Leaves. Tickets solved is this month&apos;s
-          logged support tickets (support agents only). Absent days do not include today.
+          logged support tickets (support agents only); Ticket avg/day is that divided by the days logged. Absent
+          days do not include today.
         </Text>
 
         <View style={styles.footer} fixed>

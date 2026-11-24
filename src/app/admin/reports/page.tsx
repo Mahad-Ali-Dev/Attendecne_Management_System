@@ -116,11 +116,14 @@ export default async function AdminReportsPage({
   const leaveByUser = groupByUser(leaves);
   const sessionsByUser = groupByUser(sessions);
 
-  // Tickets each employee solved this month, summed per person for the new
-  // "Tickets solved" report column.
+  // Tickets each employee solved this month, summed per person, plus the number
+  // of days they logged any (one ticket_reports row per day) — together these
+  // feed the "Tickets solved" and "Ticket avg/day" report columns.
   const ticketsByUser = new Map<string, number>();
+  const ticketDaysByUser = new Map<string, number>();
   for (const t of tickets) {
     ticketsByUser.set(t.user_id, (ticketsByUser.get(t.user_id) ?? 0) + t.tickets_solved);
+    if (t.tickets_solved > 0) ticketDaysByUser.set(t.user_id, (ticketDaysByUser.get(t.user_id) ?? 0) + 1);
   }
 
   // Someone who registered after this month ended wasn't an employee yet; and
@@ -140,6 +143,7 @@ export default async function AdminReportsPage({
       leaveDatesSet(leaveByUser.get(emp.id) ?? []),
       sessionsByUser.get(emp.id) ?? [],
       ticketsByUser.get(emp.id) ?? 0,
+      ticketDaysByUser.get(emp.id) ?? 0,
     ),
   );
 
@@ -201,7 +205,7 @@ export default async function AdminReportsPage({
       ) : (
         <div className="card overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1580px] text-sm">
+            <table className="w-full min-w-[1680px] text-sm">
               <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-400">
                 <tr>
                   <th className="sticky left-0 z-10 min-w-[13rem] bg-slate-50 px-6 py-3 text-left font-medium">
@@ -255,7 +259,7 @@ export default async function AdminReportsPage({
         included); Required hours exclude approved leave so time off doesn&apos;t lower attendance. Extra days
         are rest days the employee worked. Total days worked = Present + Extra days. Paid working days =
         Present + Extra days + Leaves. Tickets solved is this month&apos;s logged support tickets (support agents
-        only). Click an employee for their full month.
+        only); Ticket avg/day is that divided by the days they logged. Click an employee for their full month.
       </p>
     </div>
   );

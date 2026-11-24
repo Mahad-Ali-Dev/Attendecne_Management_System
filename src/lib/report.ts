@@ -27,6 +27,8 @@ export interface ReportRow {
   trackedUnproductiveHours: number;
   /** Support tickets solved this month; null for employees who aren't support agents. */
   ticketsSolved: number | null;
+  /** Distinct days this month the agent logged tickets — the divisor for the daily average. */
+  ticketDaysLogged: number;
 }
 
 /** Whole-number percent of `done` against `required`; null when nothing was required. */
@@ -83,6 +85,13 @@ export const REPORT_COLUMNS: ReportColumn[] = [
     label: "Tickets solved",
     value: (r) => (r.ticketsSolved === null ? "—" : String(r.ticketsSolved)),
   },
+  // Average tickets per day the agent actually logged this month.
+  {
+    key: "ticketAvgPerDay",
+    label: "Ticket avg/day",
+    value: (r) =>
+      r.ticketsSolved === null || r.ticketDaysLogged <= 0 ? "—" : (r.ticketsSolved / r.ticketDaysLogged).toFixed(1),
+  },
   { key: "attendancePct", label: "Attendance", value: (r) => pct(percentOf(r.completedHours, r.requiredHours)) },
   { key: "trackingPct", label: "Tracking", value: (r) => pct(percentOf(r.trackedHours, r.requiredTrackingHours)) },
 ];
@@ -104,7 +113,9 @@ export function buildReportRow(
   leaveDates: Set<string>,
   sessions: ProductivitySession[],
   /** Support tickets this employee solved in the month (0 if none / not a support agent). */
-  monthTickets = 0
+  monthTickets = 0,
+  /** Distinct days this month the employee logged tickets (divisor for the daily average). */
+  monthTicketDays = 0
 ): ReportRow {
   const shiftHours = shiftLengthHours(employee.shift_start, employee.shift_end);
   const days = buildMonthDayHours(attendance, monthKey, shiftHours, todayKey, leaveDates, employee.off_days ?? [0, 6]);
@@ -140,5 +151,6 @@ export function buildReportRow(
     // Show a figure for support agents (even 0) and for anyone who logged
     // tickets this month; "—" for the rest so the column isn't a wall of zeros.
     ticketsSolved: (employee.is_support ?? false) || monthTickets > 0 ? monthTickets : null,
+    ticketDaysLogged: monthTicketDays,
   };
 }
