@@ -10,7 +10,7 @@ import { StatCard } from "@/components/StatCard";
 import { productivityPercent } from "@/lib/productivity";
 import { formatDate, formatHours, pktNow } from "@/lib/format";
 import type { AppActivity, ProductivitySession } from "@/lib/types";
-import { AlertTriangle, Loader2, Pencil, Percent, Plus, Target, Trash2, TrendingUp } from "lucide-react";
+import { AlertTriangle, Clock, Loader2, Pencil, Plus, Target, Trash2, TrendingDown, TrendingUp } from "lucide-react";
 
 interface EditState {
   mode: "add" | "edit";
@@ -48,8 +48,11 @@ export function EmployeeProductivity({
   // Graph by default; the tab in the header swaps in the full day-by-day table.
   const [view, setView] = useState<"chart" | "table">("chart");
   const appsForViewing = viewingDate ? apps.filter((a) => a.work_date === viewingDate) : [];
-  const trackedHours = sessions.reduce((sum, s) => sum + s.total_productive_seconds, 0) / 3600;
-  const completionPct = requiredHours > 0 ? Math.round((trackedHours / requiredHours) * 100) : 0;
+  const productiveHours = sessions.reduce((sum, s) => sum + s.total_productive_seconds, 0) / 3600;
+  const unproductiveHours = sessions.reduce((sum, s) => sum + s.total_unproductive_seconds, 0) / 3600;
+  const totalTrackedHours = productiveHours + unproductiveHours;
+  // Completion compares TOTAL tracked time (productive + unproductive) to the target.
+  const completionPct = requiredHours > 0 ? Math.round((totalTrackedHours / requiredHours) * 100) : 0;
 
   // One bar per calendar day in the selected month (zero-filled), so the
   // admin sees the daily shape at a glance — the table below still only
@@ -187,20 +190,35 @@ export function EmployeeProductivity({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 border-b border-slate-100 p-6 sm:grid-cols-3">
-        <StatCard icon={<Target className="h-5 w-5" />} label="Required this month" value={formatHours(requiredHours)} />
-        <StatCard
-          icon={<TrendingUp className="h-5 w-5" />}
-          label="Tracked productive"
-          value={formatHours(trackedHours)}
-          accent="text-emerald-600"
-        />
-        <StatCard
-          icon={<Percent className="h-5 w-5" />}
-          label="Target completion"
-          value={`${completionPct}%`}
-          accent="text-brand-600"
-        />
+      <div className="space-y-4 border-b border-slate-100 p-6">
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <StatCard icon={<Target className="h-5 w-5" />} label="Required this month" value={formatHours(requiredHours)} />
+          <StatCard icon={<Clock className="h-5 w-5" />} label="Total tracked" value={formatHours(totalTrackedHours)} />
+          <StatCard
+            icon={<TrendingUp className="h-5 w-5" />}
+            label="Productive"
+            value={formatHours(productiveHours)}
+            accent="text-emerald-600"
+          />
+          <StatCard
+            icon={<TrendingDown className="h-5 w-5" />}
+            label="Unproductive"
+            value={formatHours(unproductiveHours)}
+            accent="text-amber-600"
+          />
+        </div>
+        <div>
+          <div className="mb-1.5 flex items-center justify-between text-xs">
+            <span className="font-medium text-slate-500">Target completion (of total tracked)</span>
+            <span className="font-semibold text-brand-600">{completionPct}%</span>
+          </div>
+          <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+            <div
+              className="h-full rounded-full bg-brand-500 transition-all"
+              style={{ width: `${Math.min(100, completionPct)}%` }}
+            />
+          </div>
+        </div>
       </div>
 
       {view === "chart" && (

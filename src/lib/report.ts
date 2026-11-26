@@ -93,7 +93,12 @@ export const REPORT_COLUMNS: ReportColumn[] = [
       r.ticketsSolved === null || r.ticketDaysLogged <= 0 ? "—" : (r.ticketsSolved / r.ticketDaysLogged).toFixed(1),
   },
   { key: "attendancePct", label: "Attendance", value: (r) => pct(percentOf(r.completedHours, r.requiredHours)) },
-  { key: "trackingPct", label: "Tracking", value: (r) => pct(percentOf(r.trackedHours, r.requiredTrackingHours)) },
+  // Tracking % compares TOTAL tracked time (productive + unproductive) to the target.
+  {
+    key: "trackingPct",
+    label: "Tracking",
+    value: (r) => pct(percentOf(r.trackedHours + r.trackedUnproductiveHours, r.requiredTrackingHours)),
+  },
 ];
 
 /**

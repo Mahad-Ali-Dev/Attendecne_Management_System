@@ -65,8 +65,9 @@ export default async function ProductivityPage() {
   const workingDaysTotal = productivityDays.filter((d) => !d.isRestDay).length;
   const leaveDaysTotal = productivityDays.filter((d) => d.status === "ON_LEAVE").length;
   const requiredHoursTotal = (workingDaysTotal - leaveDaysTotal) * targetHours;
+  // Completion compares TOTAL tracked time (productive + unproductive) to the target.
   const targetCompletionPct =
-    requiredHoursTotal > 0 ? Math.round((monthProductiveSeconds / 3600 / requiredHoursTotal) * 100) : 0;
+    requiredHoursTotal > 0 ? Math.round((monthTotalSeconds / 3600 / requiredHoursTotal) * 100) : 0;
 
   return (
     <div className="space-y-6">
@@ -150,18 +151,31 @@ export default async function ProductivityPage() {
         </p>
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           <StatCard icon={<Target className="h-5 w-5" />} label="Required this month" value={formatHours(requiredHoursTotal)} />
+          <StatCard icon={<Clock className="h-5 w-5" />} label="Total tracked" value={formatHours(monthTotalSeconds / 3600)} />
           <StatCard
             icon={<TrendingUp className="h-5 w-5" />}
-            label="Tracked productive"
+            label="Productive"
             value={formatHours(monthProductiveSeconds / 3600)}
             accent="text-emerald-600"
           />
           <StatCard
-            icon={<Percent className="h-5 w-5" />}
-            label="Target completion"
-            value={`${targetCompletionPct}%`}
-            accent="text-brand-600"
+            icon={<TrendingDown className="h-5 w-5" />}
+            label="Unproductive"
+            value={formatHours(monthUnproductiveSeconds / 3600)}
+            accent="text-amber-600"
           />
+        </div>
+        <div className="mt-4">
+          <div className="mb-1.5 flex items-center justify-between text-xs">
+            <span className="font-medium text-slate-500">Target completion (of total tracked)</span>
+            <span className="font-semibold text-brand-600">{targetCompletionPct}%</span>
+          </div>
+          <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+            <div
+              className="h-full rounded-full bg-brand-500 transition-all"
+              style={{ width: `${Math.min(100, targetCompletionPct)}%` }}
+            />
+          </div>
         </div>
       </div>
 
