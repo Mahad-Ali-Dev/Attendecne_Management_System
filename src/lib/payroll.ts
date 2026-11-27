@@ -132,3 +132,21 @@ export function autoBonus(basicSalary: number, extraDays: number): number {
   if (extraDays <= 0) return 0;
   return Math.round(extraDays * dailyRate(basicSalary));
 }
+
+// Support-ticket bonus. Agents are expected to solve TICKET_DAILY_TARGET tickets
+// a day; anything above that on a day is an "extra ticket". The per-ticket rate
+// is the basic salary divided by TICKET_BONUS_DIVISOR (90/day × 22 days = 1980),
+// and the bonus is that rate times the month's extra tickets.
+export const TICKET_DAILY_TARGET = 90;
+export const TICKET_BONUS_DIVISOR = 1980;
+
+/** Tickets solved above the 90/day target, summed across the given daily counts. */
+export function extraTicketsFromDaily(dailyCounts: number[]): number {
+  return dailyCounts.reduce((sum, c) => sum + Math.max(0, c - TICKET_DAILY_TARGET), 0);
+}
+
+/** Ticket bonus: (basic ÷ 1980) per extra ticket solved above 90/day. */
+export function ticketBonus(basicSalary: number, extraTickets: number): number {
+  if (basicSalary <= 0 || extraTickets <= 0) return 0;
+  return Math.round((basicSalary / TICKET_BONUS_DIVISOR) * extraTickets);
+}

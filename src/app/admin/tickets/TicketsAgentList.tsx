@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Avatar } from "@/components/Avatar";
 import { Modal } from "@/components/Modal";
 import { formatDate } from "@/lib/format";
+import { TICKET_DAILY_TARGET } from "@/lib/payroll";
 import { upsertTicketReport, deleteTicketReport } from "@/app/admin/employees/actions";
 import { ChevronDown, ExternalLink, Pencil, Trash2, Plus, Loader2 } from "lucide-react";
 
@@ -117,6 +118,7 @@ export function TicketsAgentList({
         <span className="w-6 text-center">#</span>
         <span className="flex-1">Agent</span>
         <span className="w-20 text-right">Avg / day</span>
+        <span className="w-16 text-right">Extra 90+</span>
         <span className="w-28 text-right">{monthShort} total</span>
         <span className="w-24 text-right">All time</span>
         <span className="w-5" />
@@ -127,6 +129,8 @@ export function TicketsAgentList({
         // Average over the days the agent actually logged tickets this month.
         const loggedDays = row.days.filter((d) => d.count > 0).length;
         const avgPerDay = loggedDays > 0 ? (row.monthTotal / loggedDays).toFixed(1) : "—";
+        // Tickets solved above the 90/day target this month (drives the ticket bonus).
+        const extra = row.days.reduce((s, d) => s + Math.max(0, d.count - TICKET_DAILY_TARGET), 0);
         return (
           <div key={row.id}>
             <button
@@ -145,6 +149,14 @@ export function TicketsAgentList({
                 <div className="font-semibold tabular-nums text-navy">{avgPerDay}</div>
                 <div className="text-[10px] font-medium uppercase tracking-wide text-slate-400 sm:hidden">
                   Avg / day
+                </div>
+              </div>
+              <div className="w-16 text-right">
+                <div className={`font-semibold tabular-nums ${extra > 0 ? "text-sky-600" : "text-slate-400"}`}>
+                  {extra}
+                </div>
+                <div className="text-[10px] font-medium uppercase tracking-wide text-slate-400 sm:hidden">
+                  Extra 90+
                 </div>
               </div>
               <div className="w-28 text-right">

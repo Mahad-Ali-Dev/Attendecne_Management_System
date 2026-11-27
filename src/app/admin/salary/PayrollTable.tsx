@@ -8,11 +8,17 @@ import { SalaryForm } from "../SalaryForm";
 import { deleteSalarySlip } from "../employees/actions";
 import { Modal } from "@/components/Modal";
 import { formatCurrency, formatMonthLabel } from "@/lib/format";
-import type { Attendance, LeaveRequest, Profile, SalarySlip } from "@/lib/types";
+import type { Attendance, LeaveRequest, Profile, SalarySlip, TicketReport } from "@/lib/types";
 import { ChevronDown, ChevronUp, Loader2, Trash2 } from "lucide-react";
 
-function netPay(s: { basic_salary: number; allowances: number; performance_bonus: number; deductions: number }) {
-  return s.basic_salary + s.allowances + (s.performance_bonus ?? 0) - s.deductions;
+function netPay(s: {
+  basic_salary: number;
+  allowances: number;
+  performance_bonus: number;
+  ticket_bonus: number;
+  deductions: number;
+}) {
+  return s.basic_salary + s.allowances + (s.performance_bonus ?? 0) + (s.ticket_bonus ?? 0) - s.deductions;
 }
 
 export function PayrollTable({
@@ -21,12 +27,14 @@ export function PayrollTable({
   slips,
   attendance,
   leaveRequests,
+  tickets,
 }: {
   employees: Profile[];
   month: string;
   slips: SalarySlip[];
   attendance: Attendance[];
   leaveRequests: LeaveRequest[];
+  tickets: TicketReport[];
 }) {
   const router = useRouter();
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -85,6 +93,15 @@ export function PayrollTable({
     return map;
   }, [leaveRequests]);
 
+  const ticketsByUser = useMemo(() => {
+    const map = new Map<string, TicketReport[]>();
+    for (const t of tickets) {
+      if (!map.has(t.user_id)) map.set(t.user_id, []);
+      map.get(t.user_id)!.push(t);
+    }
+    return map;
+  }, [tickets]);
+
   if (employees.length === 0) {
     return (
       <div className="card px-6 py-12 text-center text-sm text-slate-400">No employees registered yet.</div>
@@ -124,7 +141,9 @@ export function PayrollTable({
                   </td>
                   <td className="px-6 py-3">{slip ? formatCurrency(slip.basic_salary) : "—"}</td>
                   <td className="px-6 py-3">{slip ? formatCurrency(slip.allowances) : "—"}</td>
-                  <td className="px-6 py-3">{slip ? formatCurrency(slip.performance_bonus ?? 0) : "—"}</td>
+                  <td className="px-6 py-3">
+                    {slip ? formatCurrency((slip.performance_bonus ?? 0) + (slip.ticket_bonus ?? 0)) : "—"}
+                  </td>
                   <td className="px-6 py-3">{slip ? formatCurrency(slip.deductions) : "—"}</td>
                   <td className="px-6 py-3 font-semibold text-navy">{slip ? formatCurrency(netPay(slip)) : "—"}</td>
                   <td className="px-6 py-3">
@@ -170,6 +189,7 @@ export function PayrollTable({
                         offDays={emp.off_days}
                         attendance={attendanceByUser.get(emp.id) ?? []}
                         leaveRequests={leaveByUser.get(emp.id) ?? []}
+                        tickets={ticketsByUser.get(emp.id) ?? []}
                         existingSlip={slip}
                         previousSlip={previousSlipByUser.get(emp.id)}
                         onSaved={() => setExpanded(null)}

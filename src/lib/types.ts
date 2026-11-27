@@ -59,6 +59,8 @@ export interface SalarySlip {
   allowances: number;
   /** Discretionary performance bonus; adds to net pay like allowances. */
   performance_bonus: number;
+  /** Support-ticket bonus (tickets above 90/day); adds to net pay like allowances. */
+  ticket_bonus: number;
   deductions: number;
   note: string | null;
   created_at: string;

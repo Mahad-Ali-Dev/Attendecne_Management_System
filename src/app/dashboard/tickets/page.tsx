@@ -5,8 +5,9 @@ import { fetchAll } from "@/lib/fetchAll";
 import { StatCard } from "@/components/StatCard";
 import { TicketLogForm } from "./TicketLogForm";
 import { pktNow } from "@/lib/format";
+import { TICKET_DAILY_TARGET } from "@/lib/payroll";
 import type { TicketReport } from "@/lib/types";
-import { Ticket, CalendarDays, Sigma } from "lucide-react";
+import { Ticket, CalendarDays, Sigma, Zap } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -29,9 +30,10 @@ export default async function TicketsPage() {
 
   const todayKey = pktNow().toISOString().slice(0, 10);
   const monthKey = todayKey.slice(0, 7);
-  const monthTotal = entries
-    .filter((e) => e.work_date.slice(0, 7) === monthKey)
-    .reduce((sum, e) => sum + e.tickets_solved, 0);
+  const monthEntries = entries.filter((e) => e.work_date.slice(0, 7) === monthKey);
+  const monthTotal = monthEntries.reduce((sum, e) => sum + e.tickets_solved, 0);
+  // Tickets solved above the 90/day target this month (counts toward the ticket bonus).
+  const monthExtra = monthEntries.reduce((sum, e) => sum + Math.max(0, e.tickets_solved - TICKET_DAILY_TARGET), 0);
   const allTimeTotal = entries.reduce((sum, e) => sum + e.tickets_solved, 0);
   const todayCount = entries.find((e) => e.work_date === todayKey)?.tickets_solved ?? 0;
 
@@ -42,9 +44,15 @@ export default async function TicketsPage() {
         <p className="mt-1 text-sm text-slate-500">Your daily ticket counts. Record today&apos;s from your dashboard.</p>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard icon={<Ticket className="h-5 w-5" />} label="Today" value={todayCount} accent="text-brand-600" />
         <StatCard icon={<CalendarDays className="h-5 w-5" />} label="This month" value={monthTotal} />
+        <StatCard
+          icon={<Zap className="h-5 w-5" />}
+          label="Extra (90+)"
+          value={monthExtra}
+          accent={monthExtra > 0 ? "text-sky-600" : "text-navy"}
+        />
         <StatCard icon={<Sigma className="h-5 w-5" />} label="All time" value={allTimeTotal} />
       </div>
 

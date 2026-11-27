@@ -80,7 +80,8 @@ export function SalarySlipDocument({
   monthLabel: string;
   attendanceSummary: AttendanceSummary;
 }) {
-  const netPay = slip.basic_salary + slip.allowances + (slip.performance_bonus ?? 0) - slip.deductions;
+  const netPay =
+    slip.basic_salary + slip.allowances + (slip.performance_bonus ?? 0) + (slip.ticket_bonus ?? 0) - slip.deductions;
   return (
     <Document>
       <Page size="A4" style={styles.page}>
@@ -131,6 +132,12 @@ export function SalarySlipDocument({
               <View style={styles.tableRow}>
                 <Text style={styles.label}>Performance bonus</Text>
                 <Text style={styles.value}>{formatCurrency(slip.performance_bonus ?? 0)}</Text>
+              </View>
+            )}
+            {(slip.ticket_bonus ?? 0) > 0 && (
+              <View style={styles.tableRow}>
+                <Text style={styles.label}>Ticket bonus</Text>
+                <Text style={styles.value}>{formatCurrency(slip.ticket_bonus ?? 0)}</Text>
               </View>
             )}
             <View style={styles.tableRow}>

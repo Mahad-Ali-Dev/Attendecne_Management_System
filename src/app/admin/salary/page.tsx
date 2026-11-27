@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { StatCard } from "@/components/StatCard";
 import { PayrollTable } from "./PayrollTable";
 import { formatCurrency, formatMonthLabel, isActiveInMonth, monthKeyOf, pktNow, shiftMonthKey } from "@/lib/format";
-import type { Attendance, LeaveRequest, Profile, SalarySlip } from "@/lib/types";
+import type { Attendance, LeaveRequest, Profile, SalarySlip, TicketReport } from "@/lib/types";
 import { Users, CheckCircle2, Clock3, Wallet, ChevronLeft, ChevronRight } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -23,14 +23,18 @@ export default async function AdminSalaryPage({
 
   const salaryLookback = new Date(Date.now() - 400 * 86_400_000).toISOString().slice(0, 10);
 
-  const [{ data: profilesData }, { data: slipsData }, { data: attData }, { data: leaveData }] = await Promise.all([
-    supabase.from("profiles").select("*").neq("role", "ADMIN").order("full_name"),
-    // Every slip, every employee — the table figures out per-employee "this
-    // month" vs. "most recent prior" (for carry-forward) on the client.
-    supabase.from("salary_slips").select("*").order("month", { ascending: false }),
-    supabase.from("attendance").select("*").gte("work_date", salaryLookback),
-    supabase.from("leave_requests").select("*").eq("status", "APPROVED"),
-  ]);
+  const [{ data: profilesData }, { data: slipsData }, { data: attData }, { data: leaveData }, { data: ticketData }] =
+    await Promise.all([
+      supabase.from("profiles").select("*").neq("role", "ADMIN").order("full_name"),
+      // Every slip, every employee — the table figures out per-employee "this
+      // month" vs. "most recent prior" (for carry-forward) on the client.
+      supabase.from("salary_slips").select("*").order("month", { ascending: false }),
+      supabase.from("attendance").select("*").gte("work_date", salaryLookback),
+      supabase.from("leave_requests").select("*").eq("status", "APPROVED"),
+      // Tickets over the same window, so the editor can work out the ticket bonus
+      // for whichever month is open.
+      supabase.from("ticket_reports").select("*").gte("work_date", salaryLookback),
+    ]);
 
   // Someone disabled before this month began is no longer on payroll for it;
   // the month they left (and every earlier one) still lists them.
@@ -40,11 +44,12 @@ export default async function AdminSalaryPage({
   const slips = (slipsData ?? []) as SalarySlip[];
   const attendance = (attData ?? []) as Attendance[];
   const leaveRequests = (leaveData ?? []) as LeaveRequest[];
+  const tickets = (ticketData ?? []) as TicketReport[];
 
   const slipsThisMonth = slips.filter((s) => s.month.slice(0, 7) === monthKey);
   const paidCount = slipsThisMonth.length;
   const totalPayroll = slipsThisMonth.reduce(
-    (sum, s) => sum + s.basic_salary + s.allowances + (s.performance_bonus ?? 0) - s.deductions,
+    (sum, s) => sum + s.basic_salary + s.allowances + (s.performance_bonus ?? 0) + (s.ticket_bonus ?? 0) - s.deductions,
     0
   );
 
@@ -111,6 +116,7 @@ export default async function AdminSalaryPage({
         slips={slips}
         attendance={attendance}
         leaveRequests={leaveRequests}
+        tickets={tickets}
       />
     </div>
   );

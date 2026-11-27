@@ -4,9 +4,28 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { upsertSalarySlip } from "./actions";
 import { formatCurrency, pktNow } from "@/lib/format";
-import { summarizeMonth, autoDeduction, autoBonus, dailyRate, leaveDatesSet } from "@/lib/payroll";
-import type { Attendance, LeaveRequest, SalarySlip } from "@/lib/types";
-import { Loader2, UserCheck, UserX, TrendingUp, CalendarCheck, CalendarOff, Wallet, RefreshCw } from "lucide-react";
+import {
+  summarizeMonth,
+  autoDeduction,
+  autoBonus,
+  dailyRate,
+  leaveDatesSet,
+  ticketBonus,
+  extraTicketsFromDaily,
+  TICKET_BONUS_DIVISOR,
+} from "@/lib/payroll";
+import type { Attendance, LeaveRequest, SalarySlip, TicketReport } from "@/lib/types";
+import {
+  Loader2,
+  UserCheck,
+  UserX,
+  TrendingUp,
+  CalendarCheck,
+  CalendarOff,
+  Wallet,
+  RefreshCw,
+  Ticket,
+} from "lucide-react";
 
 /**
  * The actual salary editing UI: attendance-vs-target breakdown, an
@@ -22,6 +41,7 @@ export function SalaryForm({
   offDays,
   attendance,
   leaveRequests = [],
+  tickets = [],
   existingSlip,
   previousSlip,
   onSaved,
@@ -33,6 +53,8 @@ export function SalaryForm({
   offDays?: number[];
   attendance: Attendance[];
   leaveRequests?: LeaveRequest[];
+  /** The employee's ticket reports (one row per day) — drives the ticket bonus. */
+  tickets?: TicketReport[];
   existingSlip?: SalarySlip;
   previousSlip?: SalarySlip;
   onSaved?: () => void;
@@ -49,6 +71,10 @@ export function SalaryForm({
   const [performanceBonus, setPerformanceBonus] = useState(
     existingSlip ? String(existingSlip.performance_bonus ?? 0) : ""
   );
+  // The ticket bonus is also a per-month amount, so it doesn't carry forward.
+  const [ticketBonusField, setTicketBonusField] = useState(
+    existingSlip ? String(existingSlip.ticket_bonus ?? 0) : ""
+  );
   const [note, setNote] = useState(existingSlip?.note ?? "");
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -64,8 +90,19 @@ export function SalaryForm({
   const suggestedDeduction = autoDeduction(basicSalaryNum, summary.absentDays);
   const suggestedBonus = autoBonus(basicSalaryNum, summary.extraDays);
   const perDay = dailyRate(basicSalaryNum);
+  // Ticket bonus: tickets solved above 90/day this month, paid at basic ÷ 1980 each.
+  const extraTickets = useMemo(
+    () => extraTicketsFromDaily(tickets.filter((t) => t.work_date.slice(0, 7) === month).map((t) => t.tickets_solved)),
+    [tickets, month]
+  );
+  const ticketRate = basicSalaryNum > 0 ? basicSalaryNum / TICKET_BONUS_DIVISOR : 0;
+  const suggestedTicketBonus = ticketBonus(basicSalaryNum, extraTickets);
   const netPay =
-    basicSalaryNum + (Number(allowances) || 0) + (Number(performanceBonus) || 0) - (Number(deductions) || 0);
+    basicSalaryNum +
+    (Number(allowances) || 0) +
+    (Number(performanceBonus) || 0) +
+    (Number(ticketBonusField) || 0) -
+    (Number(deductions) || 0);
   // Paid days (present + approved leave) as a share of the month's working days.
   const paidDays = summary.presentDays + summary.leaveDays;
   const workedRatio = summary.workingDays > 0 ? Math.min(100, (paidDays / summary.workingDays) * 100) : 100;
@@ -86,6 +123,7 @@ export function SalaryForm({
         basicSalaryNum,
         Number(allowances) || 0,
         Number(performanceBonus) || 0,
+        Number(ticketBonusField) || 0,
         Number(deductions) || 0,
         note
       );
@@ -195,6 +233,24 @@ export function SalaryForm({
             </button>
           </div>
         )}
+
+        {extraTickets > 0 && basicSalaryNum > 0 && (
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg bg-sky-50 px-3 py-2.5 text-xs text-sky-800">
+            <span className="inline-flex flex-wrap items-center gap-1.5">
+              <Ticket className="h-3.5 w-3.5 shrink-0" />
+              Suggested ticket bonus: <span className="font-semibold">{formatCurrency(suggestedTicketBonus)}</span> (
+              {extraTickets} extra {extraTickets === 1 ? "ticket" : "tickets"} over 90/day ×{" "}
+              {formatCurrency(ticketRate)}/ticket)
+            </span>
+            <button
+              type="button"
+              onClick={() => setTicketBonusField(String(suggestedTicketBonus))}
+              className="inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 font-semibold text-sky-700 shadow-sm transition hover:bg-sky-100"
+            >
+              <RefreshCw className="h-3 w-3" /> Use this
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="mt-4 flex flex-wrap items-end gap-3">
@@ -229,6 +285,17 @@ export function SalaryForm({
             step="1"
             value={performanceBonus}
             onChange={(e) => setPerformanceBonus(e.target.value)}
+            className="input w-32"
+          />
+        </div>
+        <div>
+          <label className="label">Ticket bonus</label>
+          <input
+            type="number"
+            min={0}
+            step="1"
+            value={ticketBonusField}
+            onChange={(e) => setTicketBonusField(e.target.value)}
             className="input w-32"
           />
         </div>

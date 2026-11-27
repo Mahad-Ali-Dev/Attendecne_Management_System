@@ -393,6 +393,7 @@ export default async function EmployeeDetail({
         slips={slips}
         attendance={attendanceForSalary}
         leaveRequests={leaveRequests}
+        tickets={ticketRows}
         shiftStart={emp.shift_start}
         shiftEnd={emp.shift_end}
         offDays={emp.off_days}

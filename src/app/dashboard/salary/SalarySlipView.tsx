@@ -44,7 +44,8 @@ export function SalarySlipView({
     );
   }
 
-  const netPay = slip.basic_salary + slip.allowances + (slip.performance_bonus ?? 0) - slip.deductions;
+  const netPay =
+    slip.basic_salary + slip.allowances + (slip.performance_bonus ?? 0) + (slip.ticket_bonus ?? 0) - slip.deductions;
 
   return (
     <div className="card p-8">
@@ -100,6 +101,12 @@ export function SalarySlipView({
             <div className="flex justify-between py-2">
               <span className="text-slate-500">Performance bonus</span>
               <span className="font-medium text-navy">{formatCurrency(slip.performance_bonus ?? 0)}</span>
+            </div>
+          )}
+          {(slip.ticket_bonus ?? 0) > 0 && (
+            <div className="flex justify-between py-2">
+              <span className="text-slate-500">Ticket bonus</span>
+              <span className="font-medium text-navy">{formatCurrency(slip.ticket_bonus ?? 0)}</span>
             </div>
           )}
           <div className="flex justify-between py-2">

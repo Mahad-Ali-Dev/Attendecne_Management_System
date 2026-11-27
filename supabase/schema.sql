@@ -103,6 +103,7 @@ create table if not exists public.salary_slips (
   basic_salary  numeric(12,2) not null default 0,
   allowances    numeric(12,2) not null default 0,
   performance_bonus numeric(12,2) not null default 0,
+  ticket_bonus  numeric(12,2) not null default 0,
   deductions    numeric(12,2) not null default 0,
   note          text,
   created_at    timestamptz not null default now(),
@@ -113,6 +114,8 @@ create index if not exists salary_slips_user_idx on public.salary_slips (user_id
 
 -- Discretionary performance bonus, added later; adds to net pay like allowances.
 alter table public.salary_slips add column if not exists performance_bonus numeric(12,2) not null default 0;
+-- Support-ticket bonus (tickets above 90/day), added later; adds to net pay too.
+alter table public.salary_slips add column if not exists ticket_bonus numeric(12,2) not null default 0;
 
 -- ---------------------------------------------------------------------------
 -- 2c. LEAVE REQUESTS  (employee-submitted, admin-reviewed)

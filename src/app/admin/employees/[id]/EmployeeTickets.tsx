@@ -7,8 +7,9 @@ import { Modal } from "@/components/Modal";
 import { StatCard } from "@/components/StatCard";
 import { TicketsChart, type TicketChartRow } from "@/components/TicketsChart";
 import { formatDate, pktNow } from "@/lib/format";
+import { TICKET_DAILY_TARGET } from "@/lib/payroll";
 import type { TicketReport } from "@/lib/types";
-import { Ticket, CalendarDays, Gauge, Sigma, Plus, Pencil, Trash2, Loader2 } from "lucide-react";
+import { Ticket, CalendarDays, Gauge, Sigma, Plus, Pencil, Trash2, Loader2, Zap } from "lucide-react";
 
 interface TicketEdit {
   mode: "add" | "edit";
@@ -57,6 +58,8 @@ export function EmployeeTickets({
   const todayKey = pktNow().toISOString().slice(0, 10);
   const daysLogged = monthEntries.length;
   const avgPerDay = daysLogged > 0 ? ticketsThisMonth / daysLogged : 0;
+  // Tickets solved above the 90/day target this month (counts toward the ticket bonus).
+  const extraTickets = monthEntries.reduce((s, e) => s + Math.max(0, e.tickets_solved - TICKET_DAILY_TARGET), 0);
 
   // One bar per calendar day in the month (zero-filled), so the daily shape
   // reads at a glance — the table still lists only days with a real entry.
@@ -131,7 +134,7 @@ export function EmployeeTickets({
         <p className="mt-1 text-sm text-slate-500">Tickets solved in {monthLabel}, and all time.</p>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
         <StatCard
           icon={<Ticket className="h-5 w-5" />}
           label={`Solved · ${monthLabel.split(" ")[0]}`}
@@ -143,6 +146,12 @@ export function EmployeeTickets({
           icon={<Gauge className="h-5 w-5" />}
           label="Avg / logged day"
           value={daysLogged > 0 ? avgPerDay.toFixed(1) : "—"}
+        />
+        <StatCard
+          icon={<Zap className="h-5 w-5" />}
+          label="Extra (90+)"
+          value={extraTickets}
+          accent={extraTickets > 0 ? "text-sky-600" : "text-navy"}
         />
         <StatCard icon={<Sigma className="h-5 w-5" />} label="All time" value={ticketsAllTime} />
       </div>

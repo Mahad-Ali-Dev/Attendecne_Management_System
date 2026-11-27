@@ -7,11 +7,17 @@ import { deleteSalarySlip } from "../actions";
 import { Modal } from "@/components/Modal";
 import { formatCurrency, formatMonthLabel, pktNow } from "@/lib/format";
 import { summarizeMonth, leaveDatesSet } from "@/lib/payroll";
-import type { Attendance, LeaveRequest, SalarySlip } from "@/lib/types";
+import type { Attendance, LeaveRequest, SalarySlip, TicketReport } from "@/lib/types";
 import { Loader2, Pencil, Trash2 } from "lucide-react";
 
-function netPay(s: { basic_salary: number; allowances: number; performance_bonus: number; deductions: number }) {
-  return s.basic_salary + s.allowances + (s.performance_bonus ?? 0) - s.deductions;
+function netPay(s: {
+  basic_salary: number;
+  allowances: number;
+  performance_bonus: number;
+  ticket_bonus: number;
+  deductions: number;
+}) {
+  return s.basic_salary + s.allowances + (s.performance_bonus ?? 0) + (s.ticket_bonus ?? 0) - s.deductions;
 }
 
 export function SalarySlipEditor({
@@ -19,6 +25,7 @@ export function SalarySlipEditor({
   slips,
   attendance,
   leaveRequests,
+  tickets,
   shiftStart,
   shiftEnd,
   offDays,
@@ -27,6 +34,7 @@ export function SalarySlipEditor({
   slips: SalarySlip[];
   attendance: Attendance[];
   leaveRequests: LeaveRequest[];
+  tickets: TicketReport[];
   shiftStart: string;
   shiftEnd: string;
   offDays?: number[];
@@ -91,6 +99,7 @@ export function SalarySlipEditor({
               offDays={offDays}
               attendance={attendance}
               leaveRequests={leaveRequests}
+              tickets={tickets}
               existingSlip={existingSlip}
               previousSlip={previousSlip}
             />
@@ -123,7 +132,7 @@ export function SalarySlipEditor({
                   <td className="px-6 py-3 font-medium text-navy">{formatMonthLabel(slipMonthKey)}</td>
                   <td className="px-6 py-3">{formatCurrency(s.basic_salary)}</td>
                   <td className="px-6 py-3">{formatCurrency(s.allowances)}</td>
-                  <td className="px-6 py-3">{formatCurrency(s.performance_bonus ?? 0)}</td>
+                  <td className="px-6 py-3">{formatCurrency((s.performance_bonus ?? 0) + (s.ticket_bonus ?? 0))}</td>
                   <td className="px-6 py-3">{formatCurrency(s.deductions)}</td>
                   <td className="px-6 py-3">
                     {hist.absentDays > 0 ? (
